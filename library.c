@@ -1,3 +1,7 @@
+/**
+ * Copyright Jerily LTD. All Rights Reserved.
+ * SPDX-License-Identifier: MIT.
+ */
 #include "library.h"
 #include "cJSON.h"
 #include <stdio.h>

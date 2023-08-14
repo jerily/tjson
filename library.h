@@ -1,3 +1,7 @@
+/**
+ * Copyright Jerily LTD. All Rights Reserved.
+ * SPDX-License-Identifier: MIT.
+ */
 #ifndef TJSON_LIBRARY_H
 #define TJSON_LIBRARY_H
 
