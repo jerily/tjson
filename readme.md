@@ -24,7 +24,7 @@ TCL/C extension for parsing JSON.
 
 ## Clone the repository
 ```bash
-git clone --recurse-submodules git@github.com:jerily/tjson.git
+git clone --recurse-submodules https://github.com/jerily/tjson.git
 cd tjson
 TJSON_DIR=$(pwd)
 ```
