@@ -10,7 +10,7 @@ find_package(Threads REQUIRED)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DDEBUG")
 
-add_library(tjson SHARED library.c)
+add_library(tjson SHARED MODULE library.c)
 set_target_properties(tjson PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 include(${CMAKE_CURRENT_LIST_DIR}/FindTCL.cmake)

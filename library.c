@@ -45,7 +45,6 @@ static Tcl_Obj *tree_to_tcl(Tcl_Interp *interp, cJSON *item) {
             }
         case cJSON_Raw:
         {
-            size_t raw_length = 0;
             if (item->valuestring == NULL)
             {
                 return Tcl_NewStringObj("", 0);
@@ -115,7 +114,6 @@ static Tcl_Obj *tree_to_typed_tcl(Tcl_Interp *interp, cJSON *item) {
             }
         case cJSON_Raw:
         {
-            size_t raw_length = 0;
             if (item->valuestring == NULL)
             {
                 Tcl_ListObjAppendElement(interp, resultPtr, Tcl_NewStringObj("S", 1));
