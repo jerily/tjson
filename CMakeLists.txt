@@ -18,7 +18,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/FindTCL.cmake)
 if (NAVISERVER)
     include_directories(${NAVISERVER}/include)
     target_link_directories(tjson PRIVATE ${NAVISERVER}/lib)
-    target_link_libraries(tjson PRIVATE ${TCL_LIBRARY} nsd)
+    target_link_libraries(tjson PRIVATE cjson ${TCL_LIBRARY})
     target_compile_options(tjson PRIVATE -DUSE_NAVISERVER)
     install(TARGETS ${TARGET}
             LIBRARY DESTINATION ${NAVISERVER}/bin
