@@ -15,3 +15,5 @@ puts [::tjson::parse {{"a": 1, "b": true, "c": [1, 2, 3], "d": {"d1":"a", "d2":"
 
 puts [::tjson::to_json {M {a {N 1} b {BOOL 1} c {L {{N 1} {N 2} {N 3}}} d {M {d1 {S a} d2 {S b}}}}}]
 
+puts [::tjson::escape_json_string "hello\"world\n"]
+

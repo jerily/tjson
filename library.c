@@ -333,6 +333,15 @@ static int tjson_ToJsonCmd(ClientData  clientData, Tcl_Interp *interp, int objc,
     return TCL_OK;
 }
 
+static int tjson_EscapeJsonStringCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
+    DBG(fprintf(stderr, "EscapeJsonStringCmd\n"));
+    CheckArgs(2, 2, 1, "string");
+
+    const char *escaped = escape_json_string(objv[1]);
+    Tcl_SetObjResult(interp, Tcl_NewStringObj(escaped, -1));
+    return TCL_OK;
+}
+
 static void tjson_ExitHandler(ClientData unused) {
 }
 
@@ -354,6 +363,7 @@ int Tjson_Init(Tcl_Interp *interp) {
     Tcl_CreateNamespace(interp, "::tjson", NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::parse", tjson_ParseCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::to_json", tjson_ToJsonCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::escape_json_string", tjson_EscapeJsonStringCmd, NULL, NULL);
 
     return Tcl_PkgProvide(interp, "tjson", "0.1");
 }
