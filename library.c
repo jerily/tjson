@@ -9,6 +9,9 @@
 #include <string.h>
 #include <math.h>
 
+#define XSTR(s) STR(s)
+#define STR(s) #s
+
 #ifdef DEBUG
 # define DBG(x) x
 #else
@@ -365,7 +368,7 @@ int Tjson_Init(Tcl_Interp *interp) {
     Tcl_CreateObjCommand(interp, "::tjson::to_json", tjson_ToJsonCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::escape_json_string", tjson_EscapeJsonStringCmd, NULL, NULL);
 
-    return Tcl_PkgProvide(interp, "tjson", "0.1");
+    return Tcl_PkgProvide(interp, "tjson", XSTR(VERSION));
 }
 
 #ifdef USE_NAVISERVER
