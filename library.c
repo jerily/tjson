@@ -25,6 +25,15 @@
                  }
 
 #define CMD_NAME(s, internal) sprintf((s), "_TJSON_%p", (internal))
+
+#define SP " "
+#define NL "\n"
+#define LBRACKET "["
+#define RBRACKET "]"
+#define LBRACE "{"
+#define RBRACE "}"
+#define COMMA ","
+
 static int tjson_ModuleInitialized;
 
 static Tcl_HashTable tjson_NodeToInternal_HT;
@@ -500,38 +509,134 @@ const char *tjson_EscapeJsonString(Tcl_Obj *objPtr) {
     return Tcl_GetString(resultPtr);
 }
 
-Tcl_Obj *tjson_TreeToJson(Tcl_Interp *interp, cJSON *item) {
-    char *buf = cJSON_PrintUnformatted(item);
-    Tcl_Obj *resultPtr = Tcl_NewStringObj(buf, -1);
-    free(buf);
-    return resultPtr;
-}
+Tcl_Obj *tjson_TreeToJson(Tcl_Interp *interp, cJSON *item, int num_spaces) {
+    Tcl_Obj *resultPtr = NULL;
+    switch ((item->type) & 0xFF)
+    {
+        case cJSON_NULL:
+            return Tcl_NewStringObj("null", 4);
+        case cJSON_False:
+            return Tcl_NewStringObj("false", 5);
+        case cJSON_True:
+            return Tcl_NewStringObj("true", 4);
+        case cJSON_Number:
+            double d = item->valuedouble;
+            if (isnan(d) || isinf(d)) {
+                return Tcl_NewStringObj("null", 4);
+            } else if(d == (double)item->valueint) {
+                return Tcl_NewIntObj(item->valueint);
+            } else {
+                return Tcl_NewDoubleObj(item->valuedouble);
+            }
+        case cJSON_Raw:
+        {
+            if (item->valuestring == NULL)
+            {
+                return Tcl_NewStringObj("\"\"", 2);
+            }
+            Tcl_Obj *resultPtr = Tcl_NewStringObj("\"", 1);
+            Tcl_AppendStringsToObj(resultPtr, tjson_EscapeJsonString(Tcl_NewStringObj(item->valuestring, -1)), NULL);
+            Tcl_AppendObjToObj(resultPtr, Tcl_NewStringObj("\"", 1));
+            return resultPtr;
+        }
 
-Tcl_Obj *tjson_TreeToPrettyJson(Tcl_Interp *interp, cJSON *item) {
-    char *buf = cJSON_Print(item);
-    Tcl_Obj *resultPtr = Tcl_NewStringObj(buf, -1);
-    free(buf);
-    return resultPtr;
+        case cJSON_String:
+            resultPtr = Tcl_NewStringObj("\"", 1);
+            Tcl_AppendStringsToObj(resultPtr, tjson_EscapeJsonString(Tcl_NewStringObj(item->valuestring, -1)), NULL);
+            Tcl_AppendObjToObj(resultPtr, Tcl_NewStringObj("\"", 1));
+            return resultPtr;
+        case cJSON_Array:
+            resultPtr = Tcl_NewStringObj(LBRACKET, 1);
+            if (num_spaces) {
+                Tcl_AppendStringsToObj(resultPtr, NL, NULL);
+            }
+            cJSON *current_element = item->child;
+            int first_array_element = 1;
+            while (current_element != NULL) {
+                if (first_array_element) {
+                    first_array_element = 0;
+                } else {
+                    Tcl_AppendStringsToObj(resultPtr, COMMA, NULL);
+                    if (num_spaces) {
+                        Tcl_AppendStringsToObj(resultPtr, NL, NULL);
+                    }
+                }
+                if (num_spaces) {
+                    for (int i = 0; i < num_spaces; i++) {
+                        Tcl_AppendStringsToObj(resultPtr, SP, NULL);
+                    }
+                }
+                Tcl_AppendObjToObj(resultPtr, tjson_TreeToJson(interp, current_element, num_spaces > 0 ? num_spaces + 2 : 0));
+                current_element = current_element->next;
+            }
+            if (num_spaces) {
+                Tcl_AppendStringsToObj(resultPtr, NL, NULL);
+                for (int i = 0; i < num_spaces - 2; i++) {
+                    Tcl_AppendStringsToObj(resultPtr, SP, NULL);
+                }
+            }
+            Tcl_AppendStringsToObj(resultPtr, RBRACKET, NULL);
+            return resultPtr;
+        case cJSON_Object:
+            resultPtr = Tcl_NewStringObj(LBRACE, 2);
+            if (num_spaces) {
+                Tcl_AppendStringsToObj(resultPtr, NL, NULL);
+            }
+            cJSON *current_item = item->child;
+            int first_object_item = 1;
+            while (current_item) {
+                if (first_object_item) {
+                    first_object_item = 0;
+                } else {
+                    Tcl_AppendStringsToObj(resultPtr, COMMA, NULL);
+                    if (num_spaces) {
+                        Tcl_AppendStringsToObj(resultPtr, NL, NULL);
+                    }
+                }
+                if (num_spaces) {
+                    for (int i = 0; i < num_spaces; i++) {
+                        Tcl_AppendStringsToObj(resultPtr, SP, NULL);
+                    }
+                }
+                Tcl_AppendStringsToObj(resultPtr, "\"", tjson_EscapeJsonString(Tcl_NewStringObj(current_item->string, -1)), "\":", NULL);
+                if (num_spaces) {
+                    Tcl_AppendStringsToObj(resultPtr, SP, NULL);
+                }
+                Tcl_AppendObjToObj(resultPtr, tjson_TreeToJson(interp, current_item, num_spaces > 0 ? num_spaces + 2 : 0));
+                current_item = current_item->next;
+            }
+            if (num_spaces) {
+                Tcl_AppendStringsToObj(resultPtr, NL, NULL);
+                for (int i = 0; i < num_spaces - 2; i++) {
+                    Tcl_AppendStringsToObj(resultPtr, SP, NULL);
+                }
+            }
+            Tcl_AppendStringsToObj(resultPtr, RBRACE, NULL);
+            return resultPtr;
+        default:
+            return resultPtr;
+    }
 }
 
 static int tjson_ToJsonCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
-    DBG(fprintf(stderr, "ToJsonCmd\n"));
+    DBG(fprintf(stderr, "AppendItemToArrayCmd\n"));
     CheckArgs(2,2,1,"handle");
 
     const char *handle = Tcl_GetString(objv[1]);
     cJSON *root_structure = tjson_GetInternalFromNode(handle);
-    Tcl_Obj *resultPtr = tjson_TreeToJson(interp, root_structure);
+    Tcl_Obj *resultPtr = tjson_TreeToJson(interp, root_structure, 0);
     Tcl_SetObjResult(interp, resultPtr);
     return TCL_OK;
 }
 
 static int tjson_ToPrettyJsonCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
-    DBG(fprintf(stderr, "ToPrettyJsonCmd\n"));
+    DBG(fprintf(stderr, "AppendItemToArrayCmd\n"));
     CheckArgs(2,2,1,"handle");
 
     const char *handle = Tcl_GetString(objv[1]);
     cJSON *root_structure = tjson_GetInternalFromNode(handle);
-    Tcl_Obj *resultPtr = tjson_TreeToPrettyJson(interp, root_structure);
+    int num_spaces = 2;
+    Tcl_Obj *resultPtr = tjson_TreeToJson(interp, root_structure, num_spaces);
     Tcl_SetObjResult(interp, resultPtr);
     return TCL_OK;
 }
