@@ -1,5 +1,4 @@
-set dir [file dirname [info script]]
-load [file join $dir build libtjson.so]
+package require tjson
 
 set json_spec [::tjson::json_to_typed {{"a":1,"b":2,"c":"hello\nworld", "flag": true}}]
 puts json_spec=$json_spec
