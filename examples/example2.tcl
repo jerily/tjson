@@ -6,6 +6,8 @@ puts size=[::tjson::size $node_handle]
 ::tjson::add_item_to_object $node_handle f [list L [list {N 5} {N 6} {N 7}]]
 ::tjson::add_item_to_object $node_handle g [list M [list a {S "hello world"} b {N 9}]]
 puts simple,after=[::tjson::to_simple $node_handle]
+puts json,after=[::tjson::to_json $node_handle]
+puts pretty_json,after=[::tjson::to_pretty_json $node_handle]
 ::tjson::destroy $node_handle
 
 set node_handle [::tjson::parse {[1,2,3]}]

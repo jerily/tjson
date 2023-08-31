@@ -454,18 +454,6 @@ static int tjson_ToTypedCmd(ClientData  clientData, Tcl_Interp *interp, int objc
     return TCL_OK;
 }
 
-static int tjson_ToJsonCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
-    DBG(fprintf(stderr, "AppendItemToArrayCmd\n"));
-    CheckArgs(2,2,1,"handle");
-
-    const char *handle = Tcl_GetString(objv[1]);
-    cJSON *root_structure = tjson_GetInternalFromNode(handle);
-    // TODO: implement
-//    Tcl_Obj *resultPtr = tjson_TreeToJson(interp, root_structure);
-//    Tcl_SetObjResult(interp, resultPtr);
-    return TCL_OK;
-}
-
 const char *tjson_EscapeJsonString(Tcl_Obj *objPtr) {
     int length;
     const char *str = Tcl_GetStringFromObj(objPtr, &length);
@@ -510,6 +498,42 @@ const char *tjson_EscapeJsonString(Tcl_Obj *objPtr) {
         }
     }
     return Tcl_GetString(resultPtr);
+}
+
+Tcl_Obj *tjson_TreeToJson(Tcl_Interp *interp, cJSON *item) {
+    char *buf = cJSON_PrintUnformatted(item);
+    Tcl_Obj *resultPtr = Tcl_NewStringObj(buf, -1);
+    free(buf);
+    return resultPtr;
+}
+
+Tcl_Obj *tjson_TreeToPrettyJson(Tcl_Interp *interp, cJSON *item) {
+    char *buf = cJSON_Print(item);
+    Tcl_Obj *resultPtr = Tcl_NewStringObj(buf, -1);
+    free(buf);
+    return resultPtr;
+}
+
+static int tjson_ToJsonCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
+    DBG(fprintf(stderr, "ToJsonCmd\n"));
+    CheckArgs(2,2,1,"handle");
+
+    const char *handle = Tcl_GetString(objv[1]);
+    cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    Tcl_Obj *resultPtr = tjson_TreeToJson(interp, root_structure);
+    Tcl_SetObjResult(interp, resultPtr);
+    return TCL_OK;
+}
+
+static int tjson_ToPrettyJsonCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
+    DBG(fprintf(stderr, "ToPrettyJsonCmd\n"));
+    CheckArgs(2,2,1,"handle");
+
+    const char *handle = Tcl_GetString(objv[1]);
+    cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    Tcl_Obj *resultPtr = tjson_TreeToPrettyJson(interp, root_structure);
+    Tcl_SetObjResult(interp, resultPtr);
+    return TCL_OK;
 }
 
 static int serialize(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj *resultPtr);
@@ -644,6 +668,7 @@ int Tjson_Init(Tcl_Interp *interp) {
     Tcl_CreateObjCommand(interp, "::tjson::to_simple", tjson_ToSimpleCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::to_typed", tjson_ToTypedCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::to_json", tjson_ToJsonCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::to_pretty_json", tjson_ToPrettyJsonCmd, NULL, NULL);
 
     return Tcl_PkgProvide(interp, "tjson", XSTR(VERSION));
 }

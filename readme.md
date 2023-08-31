@@ -90,7 +90,8 @@ make install
   - returns a simple TCL structure (e.g. list, dict, or string) for the given node
 * **::tjson::to_typed** *handle*
   - returns a typed TCL structure for the given node
-
+* **::tjson::to_json** *handle*
+    - returns a JSON string for the given node
 
 
 
