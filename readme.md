@@ -4,25 +4,27 @@ TCL/C extension for parsing JSON.
 
 ## Tcl Commands
 ```
-# Parse JSON string and return a simple TCL dictionary or a typed one.
-# ::tjson::parse json_string ?simple?
+# Parse JSON string and return a simple TCL structure
+# ::tjson::json_to_simple json_string
 
-::tjson::parse {{"a": 1, "b": true, "c": [1, 2, 3], "d": {"d1":"a", "d2":"b"}}}
-=> M {a {N 1} b {BOOL 1} c {L {{N 1} {N 2} {N 3}}} d {M {d1 {S a} d2 {S b}}}}
-
-::tjson::parse {{"a": 1, "b": true, "c": [1, 2, 3], "d": {"d1":"a", "d2":"b"}}} true
+::tjson::json_to_simple {{"a": 1, "b": true, "c": [1, 2, 3], "d": {"d1":"a", "d2":"b"}}} true
 => a 1 b 1 c {1 2 3} d {d1 a d2 b} 
 
-::tjson::parse "{{"a": 1, "b": true, "c": [1, 2, 3], "d": {"d1":"a", "d2":"b"}}" true
+# Parse JSON string and return a typed TCL structure
+# ::tjson::json_to_typed json_string
 
-# Serialize a typed TCL spec to JSON.
-# ::tjson::to_json typed_spec
+::tjson::json_to_typed {{"a": 1, "b": true, "c": [1, 2, 3], "d": {"d1":"a", "d2":"b"}}}
+=> M {a {N 1} b {BOOL 1} c {L {{N 1} {N 2} {N 3}}} d {M {d1 {S a} d2 {S b}}}}
 
-::tjson::to_json {M {a {N 1} b {BOOL 1} c {L {{N 1} {N 2} {N 3}}} d {M {d1 {S a} d2 {S b}}}}}
+# Serialize a typed TCL structure to JSON.
+# ::tjson::typed_to_json typed_spec
+
+::tjson::typed_to_json {M {a {N 1} b {BOOL 1} c {L {{N 1} {N 2} {N 3}}} d {M {d1 {S a} d2 {S b}}}}}
 => {"a": 1, "b": true, "c": [1, 2, 3], "d": {"d1": "a", "d2": "b"}}
 
 # Escape JSON string
 # ::tjson::escape_json_string string
+
 ::tjson::escape_json_string "hello\nworld\n"
 => hello\"world\n
 ```

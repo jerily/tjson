@@ -7,7 +7,7 @@ set(CMAKE_C_STANDARD_REQUIRED true)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-set(CMAKE_VERBOSE_MAKEFILE ON)
+#set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_C_FLAGS  "-DVERSION=${PROJECT_VERSION} ${CMAKE_C_FLAGS}")
 
 add_library(tjson MODULE library.c)
@@ -32,7 +32,7 @@ else ()
             LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/${TARGET}${PROJECT_VERSION}
     )
 
-    configure_file(pkgIndex.tcl.in pkgIndex.tcl.in @ONLY)
+    configure_file(pkgIndex.tcl.in pkgIndex.tcl @ONLY)
 
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/pkgIndex.tcl
             DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/${TARGET}${PROJECT_VERSION}

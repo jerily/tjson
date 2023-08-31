@@ -162,6 +162,41 @@ static Tcl_Obj *tree_to_typed_tcl(Tcl_Interp *interp, cJSON *item) {
     }
 }
 
+static int tjson_JsonToTypedCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
+    DBG(fprintf(stderr, "ParseCmd\n"));
+    CheckArgs(2,2,1,"json");
+
+    int length;
+    const char *json = Tcl_GetStringFromObj(objv[1], &length);
+
+    cJSON *root_structure = cJSON_ParseWithLength(json, length);
+    Tcl_Obj *resultPtr = tree_to_typed_tcl(interp, root_structure);
+    cJSON_Delete(root_structure);
+
+    Tcl_SetObjResult(interp, resultPtr);
+    return TCL_OK;
+}
+
+static int tjson_JsonToSimpleCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
+    DBG(fprintf(stderr, "ParseCmd\n"));
+    CheckArgs(2,2,1,"json");
+
+    int length;
+    const char *json = Tcl_GetStringFromObj(objv[1], &length);
+
+    int simple = 0;
+    if (objc == 3) {
+        Tcl_GetBoolean(interp, Tcl_GetString(objv[2]), &simple);
+    }
+
+    cJSON *root_structure = cJSON_ParseWithLength(json, length);
+    Tcl_Obj *resultPtr = tree_to_tcl(interp, root_structure);
+    cJSON_Delete(root_structure);
+
+    Tcl_SetObjResult(interp, resultPtr);
+    return TCL_OK;
+}
+
 static int tjson_ParseCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
     DBG(fprintf(stderr, "ParseCmd\n"));
     CheckArgs(2,3,1,"json ?simple_flag?");
@@ -364,9 +399,12 @@ int Tjson_Init(Tcl_Interp *interp) {
     tjson_InitModule();
 
     Tcl_CreateNamespace(interp, "::tjson", NULL, NULL);
-    Tcl_CreateObjCommand(interp, "::tjson::parse", tjson_ParseCmd, NULL, NULL);
-    Tcl_CreateObjCommand(interp, "::tjson::to_json", tjson_ToJsonCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::json_to_typed", tjson_JsonToTypedCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::json_to_simple", tjson_JsonToSimpleCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::typed_to_json", tjson_ToJsonCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::escape_json_string", tjson_EscapeJsonStringCmd, NULL, NULL);
+
+//    Tcl_CreateObjCommand(interp, "::tjson::parse", tjson_ParseCmd, NULL, NULL);
 
     return Tcl_PkgProvide(interp, "tjson", XSTR(VERSION));
 }
