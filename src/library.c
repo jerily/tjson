@@ -234,7 +234,7 @@ static Tcl_Obj *tjson_TreeToTyped(Tcl_Interp *interp, cJSON *item) {
 }
 
 static int tjson_JsonToTypedCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
-    DBG(fprintf(stderr, "ParseCmd\n"));
+    DBG(fprintf(stderr, "JsonToTypedCmd\n"));
     CheckArgs(2,2,1,"json");
 
     int length;
@@ -249,16 +249,11 @@ static int tjson_JsonToTypedCmd(ClientData  clientData, Tcl_Interp *interp, int 
 }
 
 static int tjson_JsonToSimpleCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
-    DBG(fprintf(stderr, "ParseCmd\n"));
+    DBG(fprintf(stderr, "JsonToSimpleCmd\n"));
     CheckArgs(2,2,1,"json");
 
     int length;
     const char *json = Tcl_GetStringFromObj(objv[1], &length);
-
-    int simple = 0;
-    if (objc == 3) {
-        Tcl_GetBoolean(interp, Tcl_GetString(objv[2]), &simple);
-    }
 
     cJSON *root_structure = cJSON_ParseWithLength(json, length);
     Tcl_Obj *resultPtr = tjson_TreeToSimple(interp, root_structure);
@@ -667,92 +662,101 @@ static int tjson_ToTypedCmd(ClientData  clientData, Tcl_Interp *interp, int objc
     return TCL_OK;
 }
 
-const char *tjson_EscapeJsonString(Tcl_Obj *objPtr) {
+static int tjson_EscapeJsonString(Tcl_Obj *objPtr, Tcl_DString *dsPtr) {
     int length;
     const char *str = Tcl_GetStringFromObj(objPtr, &length);
-    Tcl_Obj *resultPtr = Tcl_NewStringObj("", 0);
     // loop through each character of the input string
     for (int i = 0; i < length; i++) {
         char c = str[i];
         switch (c) {
             case '"':
-                Tcl_AppendStringsToObj(resultPtr, "\\\"", NULL);
+                Tcl_DStringAppend(dsPtr, "\\\"", 2);
                 break;
             case '\\':
-                Tcl_AppendStringsToObj(resultPtr, "\\\\", NULL);
+                Tcl_DStringAppend(dsPtr, "\\\\", 2);
                 break;
             case '\b':
-                Tcl_AppendStringsToObj(resultPtr, "\\b", NULL);
+                Tcl_DStringAppend(dsPtr, "\\b", 2);
                 break;
             case '\f':
-                Tcl_AppendStringsToObj(resultPtr, "\\f", NULL);
+                Tcl_DStringAppend(dsPtr, "\\f", 2);
                 break;
             case '\n':
-                Tcl_AppendStringsToObj(resultPtr, "\\n", NULL);
+                Tcl_DStringAppend(dsPtr, "\\n", 2);
                 break;
             case '\r':
-                Tcl_AppendStringsToObj(resultPtr, "\\r", NULL);
+                Tcl_DStringAppend(dsPtr, "\\r", 2);
                 break;
             case '\t':
-                Tcl_AppendStringsToObj(resultPtr, "\\t", NULL);
+                Tcl_DStringAppend(dsPtr, "\\t", 2);
                 break;
             default:
                 if (c < 32) {
-                    Tcl_AppendStringsToObj(resultPtr, "\\u00", NULL);
+                    Tcl_DStringAppend(dsPtr, "\\u00", 4);
                     char hex[3];
                     sprintf(hex, "%02x", c);
-                    Tcl_AppendStringsToObj(resultPtr, hex, NULL);
+                    Tcl_DStringAppend(dsPtr, hex, 2);
                 } else {
                     char tempstr[2];
                     tempstr[0] = c;
                     tempstr[1] = '\0';
-                    Tcl_AppendStringsToObj(resultPtr, tempstr, NULL);
+                    Tcl_DStringAppend(dsPtr, tempstr, 1);
                 }
         }
     }
-    return Tcl_GetString(resultPtr);
+    return TCL_OK;
 }
 
-Tcl_Obj *tjson_TreeToJson(Tcl_Interp *interp, cJSON *item, int num_spaces) {
-    Tcl_Obj *resultPtr = NULL;
+static int tjson_TreeToJson(Tcl_Interp *interp, cJSON *item, int num_spaces, Tcl_DString *dsPtr) {
     switch ((item->type) & 0xFF)
     {
         case cJSON_NULL:
-            return Tcl_NewStringObj("null", 4);
+            Tcl_DStringAppend(dsPtr, "null", 4);
+            return TCL_OK;
         case cJSON_False:
-            return Tcl_NewStringObj("false", 5);
+            Tcl_DStringAppend(dsPtr, "false", 5);
+            return TCL_OK;
         case cJSON_True:
-            return Tcl_NewStringObj("true", 4);
+            Tcl_DStringAppend(dsPtr, "true", 4);
+            return TCL_OK;
         case cJSON_Number:
             double d = item->valuedouble;
             if (isnan(d) || isinf(d)) {
-                return Tcl_NewStringObj("null", 4);
+                Tcl_DStringAppend(dsPtr, "null", 4);
+                return TCL_OK;
             } else if(d == (double)item->valueint) {
-                return Tcl_NewIntObj(item->valueint);
+                int intstr_length;
+                const char *intstr = Tcl_GetStringFromObj(Tcl_NewIntObj(item->valueint), &intstr_length);
+                Tcl_DStringAppend(dsPtr, intstr, intstr_length);
+                return TCL_OK;
             } else {
-                return Tcl_NewDoubleObj(item->valuedouble);
+                int doublestr_length;
+                const char *doublestr = Tcl_GetStringFromObj(Tcl_NewDoubleObj(item->valuedouble), &doublestr_length);
+                Tcl_DStringAppend(dsPtr, doublestr, doublestr_length);
+                return TCL_OK;
             }
         case cJSON_Raw:
         {
             if (item->valuestring == NULL)
             {
-                return Tcl_NewStringObj("\"\"", 2);
+                Tcl_DStringAppend(dsPtr, "\"\"", 2);
+                return TCL_OK;
             }
-            Tcl_Obj *resultPtr = Tcl_NewStringObj("\"", 1);
-            Tcl_AppendStringsToObj(resultPtr, tjson_EscapeJsonString(Tcl_NewStringObj(item->valuestring, -1)), NULL);
-            Tcl_AppendObjToObj(resultPtr, Tcl_NewStringObj("\"", 1));
-            return resultPtr;
+            Tcl_DStringAppend(dsPtr, "\"", 1);
+            tjson_EscapeJsonString(Tcl_NewStringObj(item->valuestring, -1), dsPtr);
+            Tcl_DStringAppend(dsPtr, "\"", 1);
+            return TCL_OK;
         }
 
         case cJSON_String:
-            resultPtr = Tcl_NewStringObj("\"", 1);
-            Tcl_AppendStringsToObj(resultPtr, tjson_EscapeJsonString(Tcl_NewStringObj(item->valuestring, -1)), NULL);
-            Tcl_AppendObjToObj(resultPtr, Tcl_NewStringObj("\"", 1));
-            return resultPtr;
+            Tcl_DStringAppend(dsPtr, "\"", 1);
+            tjson_EscapeJsonString(Tcl_NewStringObj(item->valuestring, -1), dsPtr);
+            Tcl_DStringAppend(dsPtr, "\"", 1);
+            return TCL_OK;
         case cJSON_Array:
-            resultPtr = Tcl_NewStringObj(LBRACKET, 1);
+            Tcl_DStringAppend(dsPtr, LBRACKET, 1);
             if (num_spaces) {
-                Tcl_AppendStringsToObj(resultPtr, NL, NULL);
+                Tcl_DStringAppend(dsPtr, NL, 1);
             }
             cJSON *current_element = item->child;
             int first_array_element = 1;
@@ -760,31 +764,33 @@ Tcl_Obj *tjson_TreeToJson(Tcl_Interp *interp, cJSON *item, int num_spaces) {
                 if (first_array_element) {
                     first_array_element = 0;
                 } else {
-                    Tcl_AppendStringsToObj(resultPtr, COMMA, NULL);
+                    Tcl_DStringAppend(dsPtr, COMMA, 1);
                     if (num_spaces) {
-                        Tcl_AppendStringsToObj(resultPtr, NL, NULL);
+                        Tcl_DStringAppend(dsPtr, NL, 1);
                     }
                 }
                 if (num_spaces) {
                     for (int i = 0; i < num_spaces; i++) {
-                        Tcl_AppendStringsToObj(resultPtr, SP, NULL);
+                        Tcl_DStringAppend(dsPtr, SP, 1);
                     }
                 }
-                Tcl_AppendObjToObj(resultPtr, tjson_TreeToJson(interp, current_element, num_spaces > 0 ? num_spaces + 2 : 0));
+                if (TCL_OK != tjson_TreeToJson(interp, current_element, num_spaces > 0 ? num_spaces + 2 : 0, dsPtr)) {
+                    return TCL_ERROR;
+                }
                 current_element = current_element->next;
             }
             if (num_spaces) {
-                Tcl_AppendStringsToObj(resultPtr, NL, NULL);
+                Tcl_DStringAppend(dsPtr, NL, 1);
                 for (int i = 0; i < num_spaces - 2; i++) {
-                    Tcl_AppendStringsToObj(resultPtr, SP, NULL);
+                    Tcl_DStringAppend(dsPtr, SP, 1);
                 }
             }
-            Tcl_AppendStringsToObj(resultPtr, RBRACKET, NULL);
-            return resultPtr;
+            Tcl_DStringAppend(dsPtr, RBRACKET, 1);
+            return TCL_OK;
         case cJSON_Object:
-            resultPtr = Tcl_NewStringObj(LBRACE, 2);
+            Tcl_DStringAppend(dsPtr, LBRACE, 1);
             if (num_spaces) {
-                Tcl_AppendStringsToObj(resultPtr, NL, NULL);
+                Tcl_DStringAppend(dsPtr, NL, 1);
             }
             cJSON *current_item = item->child;
             int first_object_item = 1;
@@ -792,33 +798,38 @@ Tcl_Obj *tjson_TreeToJson(Tcl_Interp *interp, cJSON *item, int num_spaces) {
                 if (first_object_item) {
                     first_object_item = 0;
                 } else {
-                    Tcl_AppendStringsToObj(resultPtr, COMMA, NULL);
+                    Tcl_DStringAppend(dsPtr, COMMA, 1);
                     if (num_spaces) {
-                        Tcl_AppendStringsToObj(resultPtr, NL, NULL);
+                        Tcl_DStringAppend(dsPtr, NL, 1);
                     }
                 }
                 if (num_spaces) {
                     for (int i = 0; i < num_spaces; i++) {
-                        Tcl_AppendStringsToObj(resultPtr, SP, NULL);
+                        Tcl_DStringAppend(dsPtr, SP, 1);
                     }
                 }
-                Tcl_AppendStringsToObj(resultPtr, "\"", tjson_EscapeJsonString(Tcl_NewStringObj(current_item->string, -1)), "\":", NULL);
+                Tcl_DStringAppend(dsPtr, "\"", 1);
+                tjson_EscapeJsonString(Tcl_NewStringObj(current_item->string, -1), dsPtr);
+                Tcl_DStringAppend(dsPtr, "\":", 2);
                 if (num_spaces) {
-                    Tcl_AppendStringsToObj(resultPtr, SP, NULL);
+                    Tcl_DStringAppend(dsPtr, SP, 1);
                 }
-                Tcl_AppendObjToObj(resultPtr, tjson_TreeToJson(interp, current_item, num_spaces > 0 ? num_spaces + 2 : 0));
+                if (TCL_OK != tjson_TreeToJson(interp, current_item, num_spaces > 0 ? num_spaces + 2 : 0, dsPtr)) {
+                    return TCL_ERROR;
+                }
                 current_item = current_item->next;
             }
             if (num_spaces) {
-                Tcl_AppendStringsToObj(resultPtr, NL, NULL);
+                Tcl_DStringAppend(dsPtr, NL, 1);
                 for (int i = 0; i < num_spaces - 2; i++) {
-                    Tcl_AppendStringsToObj(resultPtr, SP, NULL);
+                    Tcl_DStringAppend(dsPtr, SP, 1);
                 }
             }
-            Tcl_AppendStringsToObj(resultPtr, RBRACE, NULL);
-            return resultPtr;
+            Tcl_DStringAppend(dsPtr, RBRACE, 1);
+            return TCL_OK;
         default:
-            return resultPtr;
+            Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid type", -1));
+            return TCL_ERROR;
     }
 }
 
@@ -833,8 +844,14 @@ static int tjson_ToJsonCmd(ClientData  clientData, Tcl_Interp *interp, int objc,
         return TCL_ERROR;
     }
 
-    Tcl_Obj *resultPtr = tjson_TreeToJson(interp, root_structure, 0);
-    Tcl_SetObjResult(interp, resultPtr);
+    Tcl_DString ds;
+    Tcl_DStringInit(&ds);
+    if (TCL_OK != tjson_TreeToJson(interp, root_structure, 0, &ds)) {
+        Tcl_DStringFree(&ds);
+        return TCL_ERROR;
+    }
+    Tcl_DStringResult(interp, &ds);
+    Tcl_DStringFree(&ds);
     return TCL_OK;
 }
 
@@ -844,68 +861,76 @@ static int tjson_ToPrettyJsonCmd(ClientData  clientData, Tcl_Interp *interp, int
 
     const char *handle = Tcl_GetString(objv[1]);
     cJSON *root_structure = tjson_GetInternalFromNode(handle);
-    int num_spaces = 2;
-    Tcl_Obj *resultPtr = tjson_TreeToJson(interp, root_structure, num_spaces);
-    Tcl_SetObjResult(interp, resultPtr);
+
+    Tcl_DString ds;
+    Tcl_DStringInit(&ds);
+    if (TCL_OK != tjson_TreeToJson(interp, root_structure, 2, &ds)) {
+        Tcl_DStringFree(&ds);
+        return TCL_ERROR;
+    }
+    Tcl_DStringResult(interp, &ds);
+    Tcl_DStringFree(&ds);
     return TCL_OK;
 }
 
-static int serialize(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj *resultPtr);
+static int serialize(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_DString *dsPtr);
 
-static int serialize_list(Tcl_Interp *interp, Tcl_Obj *listPtr, Tcl_Obj *resultPtr) {
-    Tcl_AppendStringsToObj(resultPtr, "[", NULL);
+static int serialize_list(Tcl_Interp *interp, Tcl_Obj *listPtr, Tcl_DString *dsPtr) {
+    Tcl_DStringAppend(dsPtr, LBRACKET, 1);
     int listLength;
     Tcl_ListObjLength(interp, listPtr, &listLength);
     int first = 1;
     for (int i = 0; i < listLength; i++) {
         if (!first) {
-            Tcl_AppendStringsToObj(resultPtr, ", ", NULL);
+            Tcl_DStringAppend(dsPtr, COMMA, 1);
         } else {
             first = 0;
         }
         Tcl_Obj *elemSpecPtr;
         Tcl_ListObjIndex(interp, listPtr, i, &elemSpecPtr);
-        int ret = serialize(interp, elemSpecPtr, resultPtr);
-        if (ret) {
-            return ret;
+        if (TCL_OK != serialize(interp, elemSpecPtr, dsPtr)) {
+            return TCL_ERROR;
         }
     }
-    Tcl_AppendStringsToObj(resultPtr, "]", NULL);
-    return 0;
+    Tcl_DStringAppend(dsPtr, RBRACKET, 1);
+    return TCL_OK;
 }
 
-static int serialize_map(Tcl_Interp *interp, Tcl_Obj *dictPtr, Tcl_Obj *resultPtr) {
-    Tcl_AppendStringsToObj(resultPtr, "{", NULL);
+static int serialize_map(Tcl_Interp *interp, Tcl_Obj *dictPtr, Tcl_DString *dsPtr) {
+    Tcl_DStringAppend(dsPtr, LBRACE, 1);
     Tcl_DictSearch search;
     Tcl_Obj *key, *elemSpecPtr;
     int done;
     if (Tcl_DictObjFirst(interp, dictPtr, &search,
                          &key, &elemSpecPtr, &done) != TCL_OK) {
-        return 3; // invalid dict
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid dict", -1));
+        return TCL_ERROR; // invalid dict
     }
     int first = 1;
     for (; !done; Tcl_DictObjNext(&search, &key, &elemSpecPtr, &done)) {
         if (!first) {
-            Tcl_AppendStringsToObj(resultPtr, ", ", NULL);
+            Tcl_DStringAppend(dsPtr, COMMA, 1);
         } else {
             first = 0;
         }
-        Tcl_AppendStringsToObj(resultPtr, "\"", tjson_EscapeJsonString(key), "\": ", NULL);
-        int ret = serialize(interp, elemSpecPtr, resultPtr);
-        if (ret) {
-            return ret;
+        Tcl_DStringAppend(dsPtr, "\"", 1);
+        tjson_EscapeJsonString(key, dsPtr);
+        Tcl_DStringAppend(dsPtr, "\": ", 3);
+        if (TCL_OK != serialize(interp, elemSpecPtr, dsPtr)) {
+            return TCL_ERROR;
         }
     }
     Tcl_DictObjDone(&search);
-    Tcl_AppendStringsToObj(resultPtr, "}", NULL);
-    return 0;
+    Tcl_DStringAppend(dsPtr, RBRACE, 1);
+    return TCL_OK;
 }
 
-static int serialize(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj *resultPtr) {
+static int serialize(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_DString *dsPtr) {
     int length;
     Tcl_ListObjLength(interp, specPtr, &length);
     if (length != 2) {
-        return 1;  /* invalid spec length */
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid spec", -1));
+        return TCL_ERROR;  /* invalid spec length */
     }
     Tcl_Obj *typePtr, *valuePtr;
     Tcl_ListObjIndex(interp, specPtr, 0, &typePtr);
@@ -914,10 +939,14 @@ static int serialize(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj *resultPtr) {
     const char *type = Tcl_GetStringFromObj(typePtr, &typeLength);
     switch(type[0]) {
         case 'S':
-            Tcl_AppendStringsToObj(resultPtr, "\"", tjson_EscapeJsonString(valuePtr), "\"", NULL);
+            Tcl_DStringAppend(dsPtr, "\"", 1);
+            tjson_EscapeJsonString(valuePtr, dsPtr);
+            Tcl_DStringAppend(dsPtr, "\"", 1);
             break;
         case 'N':
-            Tcl_AppendStringsToObj(resultPtr, Tcl_GetString(valuePtr), NULL);
+            int numstr_length;
+            const char *numstr = Tcl_GetStringFromObj(valuePtr, &numstr_length);
+            Tcl_DStringAppend(dsPtr, numstr, numstr_length);
             break;
         case 'B':
             if (typeLength == 1) {
@@ -925,27 +954,59 @@ static int serialize(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj *resultPtr) {
             } else if (0 == strcmp("BOOL", type)) {
                 int flag;
                 Tcl_GetBooleanFromObj(interp, valuePtr, &flag);
-                Tcl_AppendStringsToObj(resultPtr, flag ? "true" : "false", NULL);
+                Tcl_DStringAppend(dsPtr, flag ? "true" : "false", flag ? 4 : 5);
             }
             break;
         case 'M':
-            serialize_map(interp, valuePtr, resultPtr);
+            if (TCL_OK != serialize_map(interp, valuePtr, dsPtr)) {
+                return TCL_ERROR;
+            }
             break;
         case 'L':
-            serialize_list(interp, valuePtr, resultPtr);
+            if (TCL_OK != serialize_list(interp, valuePtr, dsPtr)) {
+                return TCL_ERROR;
+            }
             break;
         default:
-            return 2;  /* invalid type */
+            Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid type in spec", -1));
+            return TCL_ERROR;  /* invalid type */
     }
-    return 0;
+    return TCL_OK;
+}
+
+
+static int tjson_TypedToJsonCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
+    DBG(fprintf(stderr, "TypedToJsonCmd\n"));
+    CheckArgs(2,2,1,"typed_spec");
+
+    int length;
+    const char *json = Tcl_GetStringFromObj(objv[1], &length);
+
+    int simple = 0;
+    if (objc == 3) {
+        Tcl_GetBoolean(interp, Tcl_GetString(objv[2]), &simple);
+    }
+
+    Tcl_DString ds;
+    Tcl_DStringInit(&ds);
+    if (TCL_OK != serialize(interp, objv[1], &ds)) {
+        Tcl_DStringFree(&ds);
+        return TCL_ERROR;
+    }
+    Tcl_DStringResult(interp, &ds);
+    Tcl_DStringFree(&ds);
+    return TCL_OK;
 }
 
 static int tjson_EscapeJsonStringCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
     DBG(fprintf(stderr, "EscapeJsonStringCmd\n"));
     CheckArgs(2, 2, 1, "string");
 
-    const char *escaped = tjson_EscapeJsonString(objv[1]);
-    Tcl_SetObjResult(interp, Tcl_NewStringObj(escaped, -1));
+    Tcl_DString ds;
+    Tcl_DStringInit(&ds);
+    tjson_EscapeJsonString(objv[1], &ds);
+    Tcl_DStringResult(interp, &ds);
+    Tcl_DStringFree(&ds);
     return TCL_OK;
 }
 
@@ -978,7 +1039,7 @@ int Tjson_Init(Tcl_Interp *interp) {
     Tcl_CreateNamespace(interp, "::tjson", NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::json_to_typed", tjson_JsonToTypedCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::json_to_simple", tjson_JsonToSimpleCmd, NULL, NULL);
-    Tcl_CreateObjCommand(interp, "::tjson::typed_to_json", tjson_ToJsonCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::typed_to_json", tjson_TypedToJsonCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::escape_json_string", tjson_EscapeJsonStringCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::parse", tjson_ParseCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::create", tjson_CreateCmd, NULL, NULL);
