@@ -25,7 +25,7 @@ TCL/C extension for parsing and manipulating JSON.
 # Escape JSON string
 # ::tjson::escape_json_string string
 
-::tjson::escape_json_string "hello\nworld\n"
+::tjson::escape_json_string "hello\"world\n"
 => hello\"world\n
 ```
 
