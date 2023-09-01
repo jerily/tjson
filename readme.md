@@ -31,19 +31,9 @@ TCL/C extension for parsing JSON.
 
 ## Clone the repository
 ```bash
-git clone --recurse-submodules https://github.com/jerily/tjson.git
+git clone https://github.com/jerily/tjson.git
 cd tjson
 TJSON_DIR=$(pwd)
-```
-
-## Build and install the dependencies
-```bash
-cd ${TJSON_DIR}/cJSON
-mkdir build
-cd build
-cmake ..
-make
-make install
 ```
 
 ## Build the library
@@ -82,17 +72,29 @@ make install
   - returns the size of the JSON node structure for the given handle
 * **::tjson::add_item_to_object** *handle* *key* *typed_spec*
   - adds an item to an object using the typed format
+* **::tjson::replace_item_in_object** *handle* *key* *typed_spec*
+  - replaces an item in an object using the given typed format
+* **::tjson::delete_item_from_object** *handle* *key*
+  - deletes an item from an object
+* **::tjson::get_object_item** *handle* *key*
+  - gets an item from an object
 * **::tjson::add_item_to_array** *handle* *typed_spec*
   - adds an item to an array using the typed format
 * **::tjson::insert_item_in_array** *handle* *index* *typed_spec*
   - inserts an item at the given 0 based index and shifts all the existing items to the right
+* **::tjson::replace_item_in_array** *handle* *index* *typed_spec*
+  - replaces an item at the given 0 based index
+* **::tjson::delete_item_from_array** *handle* *index*
+  - deletes an item at the given 0 based index and shifts all the existing items to the left
+* **::tjson::get_array_item** *handle* *index*
+  - gets an item at the given 0 based index
 * **::tjson::to_simple** *handle*
   - returns a simple TCL structure (e.g. list, dict, or string) for the given node
 * **::tjson::to_typed** *handle*
   - returns a typed TCL structure for the given node
 * **::tjson::to_json** *handle*
   - returns a JSON string for the given node
-* **::tjson::to_prety_json** *handle*
+* **::tjson::to_pretty_json** *handle*
   - returns a prettified JSON string for the given node
 
 

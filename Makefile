@@ -10,10 +10,10 @@ MOD      =  tjson.so
 #
 # Objects to build.
 #
-MODOBJS     = library.o
+MODOBJS     = src/library.o src/cJSON/cJSON.o
 
-MODLIBS  += -lcjson
+#MODLIBS  +=
 
-CFLAGS += -DUSE_NAVISERVER -I/usr/local/include/cjson
+CFLAGS += -DUSE_NAVISERVER
 
 include  $(NAVISERVER)/include/Makefile.module

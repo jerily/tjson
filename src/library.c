@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: MIT.
  */
 #include "library.h"
-#include "cJSON.h"
+#include "cJSON/cJSON.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <stdlib.h>
 
 #define XSTR(s) STR(s)
 #define STR(s) #s
@@ -72,6 +73,13 @@ tjson_UnregisterNode(const char *name) {
     DBG(fprintf(stderr, "--> UnregisterNode: name=%s entryPtr=%p\n", name, entryPtr));
 
     return entryPtr != NULL;
+}
+
+void tjson_Unregister(cJSON *internal) {
+    DBG(fprintf(stderr, "Unregister cJSON %p\n", internal));
+    char name[80];
+    CMD_NAME(name, internal);
+    tjson_UnregisterNode(name);
 }
 
 static cJSON *
@@ -272,7 +280,7 @@ static int tjson_ParseCmd(ClientData  clientData, Tcl_Interp *interp, int objc, 
     char handle[80];
     CMD_NAME(handle, root_structure);
     tjson_RegisterNode(handle, root_structure);
-//    cJSON_Delete(root_structure);
+
     Tcl_SetObjResult(interp, Tcl_NewStringObj(handle, -1));
     return TCL_OK;
 }
@@ -283,6 +291,11 @@ static int tjson_DestroyCmd(ClientData  clientData, Tcl_Interp *interp, int objc
 
     const char *handle = Tcl_GetString(objv[1]);
     cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
+
     tjson_UnregisterNode(handle);
     cJSON_Delete(root_structure);
 
@@ -295,6 +308,12 @@ static int tjson_SizeCmd(ClientData  clientData, Tcl_Interp *interp, int objc, T
 
     const char *handle = Tcl_GetString(objv[1]);
     cJSON *root_structure = tjson_GetInternalFromNode(handle);
+
+    if (!cJSON_IsArray(root_structure) && !cJSON_IsObject(root_structure)) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node is not an array or object", -1));
+        return TCL_ERROR;
+    }
+
     int size = cJSON_GetArraySize(root_structure);
     Tcl_SetObjResult(interp, Tcl_NewIntObj(size));
     return TCL_OK;
@@ -374,6 +393,24 @@ static int tjson_CreateItemFromSpec(Tcl_Interp *interp, Tcl_Obj *specPtr, cJSON 
     }
 }
 
+
+static int tjson_CreateCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
+    DBG(fprintf(stderr, "CreateCmd\n"));
+    CheckArgs(2,2,1,"typed_item_spec");
+
+    cJSON *item = NULL;
+    if (TCL_OK != tjson_CreateItemFromSpec(interp, objv[1], &item)) {
+        return TCL_ERROR;
+    }
+
+    char handle[80];
+    CMD_NAME(handle, item);
+    tjson_RegisterNode(handle, item);
+
+    Tcl_SetObjResult(interp, Tcl_NewStringObj(handle, -1));
+    return TCL_OK;
+}
+
 static int tjson_AddItemToObjectCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
     DBG(fprintf(stderr, "AddItemToObjectCmd\n"));
     CheckArgs(4,4,1,"handle key typed_item_spec");
@@ -390,7 +427,77 @@ static int tjson_AddItemToObjectCmd(ClientData  clientData, Tcl_Interp *interp, 
     if (TCL_OK != tjson_CreateItemFromSpec(interp, objv[3], &item)) {
         return TCL_ERROR;
     }
-    cJSON_AddItemToObject(root_structure, Tcl_GetString(objv[2]), item);
+    if (!cJSON_AddItemToObject(root_structure, Tcl_GetString(objv[2]), item)) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("error while adding item", -1));
+        return TCL_ERROR;
+    }
+    return TCL_OK;
+}
+
+static int tjson_ReplaceItemInObjectCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
+    DBG(fprintf(stderr, "ReplaceItemInObjectCmd\n"));
+    CheckArgs(4,4,1,"handle key typed_item_spec");
+
+    const char *handle = Tcl_GetString(objv[1]);
+    cJSON *root_structure = tjson_GetInternalFromNode(handle);
+
+    if (!cJSON_IsObject(root_structure)) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node is not an object", -1));
+        return TCL_ERROR;
+    }
+
+    cJSON *item = NULL;
+    if (TCL_OK != tjson_CreateItemFromSpec(interp, objv[3], &item)) {
+        return TCL_ERROR;
+    }
+    if (!cJSON_ReplaceItemInObjectCaseSensitive(root_structure, Tcl_GetString(objv[2]), item)) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("error while replacing item", -1));
+        return TCL_ERROR;
+    }
+    return TCL_OK;
+}
+
+static int tjson_DeleteItemFromObjectCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
+    DBG(fprintf(stderr, "ReplaceItemInObjectCmd\n"));
+    CheckArgs(3,3,1,"handle key");
+
+    const char *handle = Tcl_GetString(objv[1]);
+    cJSON *root_structure = tjson_GetInternalFromNode(handle);
+
+    if (!cJSON_IsObject(root_structure)) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node is not an object", -1));
+        return TCL_ERROR;
+    }
+
+    cJSON_DeleteItemFromObjectCaseSensitive(root_structure, Tcl_GetString(objv[2]));
+    return TCL_OK;
+}
+
+static int tjson_GetObjectItemCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
+    DBG(fprintf(stderr, "GetObjectItemCmd\n"));
+    CheckArgs(3,3,1,"handle key");
+
+    const char *handle = Tcl_GetString(objv[1]);
+    cJSON *root_structure = tjson_GetInternalFromNode(handle);
+
+    if (!cJSON_IsObject(root_structure)) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node is not an object", -1));
+        return TCL_ERROR;
+    }
+
+    cJSON *item = cJSON_GetObjectItemCaseSensitive(root_structure, Tcl_GetString(objv[2]));
+    if (item == NULL) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("key not found", -1));
+        return TCL_ERROR;
+    }
+
+    char item_handle[80];
+    CMD_NAME(item_handle, item);
+    tjson_RegisterNode(item_handle, item);
+    // IMPORTANT: mark the node to unregister when cJSON_Delete is called
+    item->flags |= VISIBLE_IN_TCL;
+
+    Tcl_SetObjResult(interp, Tcl_NewStringObj(item_handle, -1));
     return TCL_OK;
 }
 
@@ -432,11 +539,108 @@ static int tjson_InsertItemInArrayCmd(ClientData  clientData, Tcl_Interp *interp
         return TCL_ERROR;
     }
 
+    if (index < 0 || index >= cJSON_GetArraySize(root_structure)) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("index out of bounds", -1));
+        return TCL_ERROR;
+    }
+
     cJSON *item = NULL;
     if (TCL_OK != tjson_CreateItemFromSpec(interp, objv[3], &item)) {
         return TCL_ERROR;
     }
     cJSON_InsertItemInArray(root_structure, index, item);
+
+    return TCL_OK;
+}
+
+static int tjson_ReplaceItemInArrayCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
+    DBG(fprintf(stderr, "ReplaceItemInArrayCmd\n"));
+    CheckArgs(4,4,1,"handle index typed_item_spec");
+
+    const char *handle = Tcl_GetString(objv[1]);
+    cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!cJSON_IsArray(root_structure)) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node is not an array", -1));
+        return TCL_ERROR;
+    }
+
+    int index;
+    if (TCL_OK != Tcl_GetIntFromObj(interp, objv[2], &index)) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid index", -1));
+        return TCL_ERROR;
+    }
+
+    if (index < 0 || index >= cJSON_GetArraySize(root_structure)) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("index out of bounds", -1));
+        return TCL_ERROR;
+    }
+
+    cJSON *item = NULL;
+    if (TCL_OK != tjson_CreateItemFromSpec(interp, objv[3], &item)) {
+        return TCL_ERROR;
+    }
+    cJSON_ReplaceItemInArray(root_structure, index, item);
+
+    return TCL_OK;
+}
+
+static int tjson_DeleteItemFromArrayCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
+    DBG(fprintf(stderr, "DeleteItemFromArrayCmd\n"));
+    CheckArgs(3,3,1,"handle index");
+
+    const char *handle = Tcl_GetString(objv[1]);
+    cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!cJSON_IsArray(root_structure)) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node is not an array", -1));
+        return TCL_ERROR;
+    }
+
+    int index;
+    if (TCL_OK != Tcl_GetIntFromObj(interp, objv[2], &index)) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid index", -1));
+        return TCL_ERROR;
+    }
+
+    if (index < 0 || index >= cJSON_GetArraySize(root_structure)) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("index out of bounds", -1));
+        return TCL_ERROR;
+    }
+
+    cJSON_DeleteItemFromArray(root_structure, index);
+
+    return TCL_OK;
+}
+
+static int tjson_GetArrayItemCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
+    DBG(fprintf(stderr, "GetArrayItemCmd\n"));
+    CheckArgs(3,3,1,"handle index");
+
+    const char *handle = Tcl_GetString(objv[1]);
+    cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!cJSON_IsArray(root_structure)) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node is not an array", -1));
+        return TCL_ERROR;
+    }
+
+    int index;
+    if (TCL_OK != Tcl_GetIntFromObj(interp, objv[2], &index)) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid index", -1));
+        return TCL_ERROR;
+    }
+
+    if (index < 0 || index >= cJSON_GetArraySize(root_structure)) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("index out of bounds", -1));
+        return TCL_ERROR;
+    }
+
+    cJSON *item = cJSON_GetArrayItem(root_structure, index);
+    char item_handle[80];
+    CMD_NAME(item_handle, item);
+    tjson_RegisterNode(item_handle, item);
+    // IMPORTANT: mark the node to unregister when cJSON_Delete is called
+    item->flags |= VISIBLE_IN_TCL;
+
+    Tcl_SetObjResult(interp, Tcl_NewStringObj(item_handle, -1));
 
     return TCL_OK;
 }
@@ -620,10 +824,15 @@ Tcl_Obj *tjson_TreeToJson(Tcl_Interp *interp, cJSON *item, int num_spaces) {
 
 static int tjson_ToJsonCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
     DBG(fprintf(stderr, "AppendItemToArrayCmd\n"));
-    CheckArgs(2,2,1,"handle");
+    CheckArgs(2,2,1,"node_handle");
 
     const char *handle = Tcl_GetString(objv[1]);
     cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
+
     Tcl_Obj *resultPtr = tjson_TreeToJson(interp, root_structure, 0);
     Tcl_SetObjResult(interp, resultPtr);
     return TCL_OK;
@@ -746,9 +955,16 @@ static void tjson_ExitHandler(ClientData unused) {
 
 void tjson_InitModule() {
     if (!tjson_ModuleInitialized) {
+        cJSON_Hooks *hooks = malloc(sizeof(cJSON_Hooks));
+        hooks->malloc_fn = NULL;
+        hooks->free_fn = NULL;
+        hooks->unregister_fn = tjson_Unregister;
+        cJSON_InitHooks(hooks);
+        free(hooks);
         Tcl_InitHashTable(&tjson_NodeToInternal_HT, TCL_STRING_KEYS);
         Tcl_CreateThreadExitHandler(tjson_ExitHandler, NULL);
         tjson_ModuleInitialized = 1;
+        DBG(fprintf(stderr, "tjson module initialized\n"));
     }
 }
 
@@ -765,11 +981,18 @@ int Tjson_Init(Tcl_Interp *interp) {
     Tcl_CreateObjCommand(interp, "::tjson::typed_to_json", tjson_ToJsonCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::escape_json_string", tjson_EscapeJsonStringCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::parse", tjson_ParseCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::create", tjson_CreateCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::destroy", tjson_DestroyCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::size", tjson_SizeCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::add_item_to_object", tjson_AddItemToObjectCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::replace_item_in_object", tjson_ReplaceItemInObjectCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::delete_item_from_object", tjson_DeleteItemFromObjectCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::get_object_item", tjson_GetObjectItemCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::add_item_to_array", tjson_AddItemToArrayCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::insert_item_in_array", tjson_InsertItemInArrayCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::replace_item_in_array", tjson_ReplaceItemInArrayCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::delete_item_from_array", tjson_DeleteItemFromArrayCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::get_array_item", tjson_GetArrayItemCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::to_simple", tjson_ToSimpleCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::to_typed", tjson_ToTypedCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::to_json", tjson_ToJsonCmd, NULL, NULL);
