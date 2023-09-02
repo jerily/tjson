@@ -5,6 +5,7 @@
  */
 #include "library.h"
 #include "cJSON/cJSON.h"
+#include "jsonpath/jsonpath.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -641,7 +642,7 @@ static int tjson_GetArrayItemCmd(ClientData  clientData, Tcl_Interp *interp, int
 }
 
 static int tjson_ToSimpleCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
-    DBG(fprintf(stderr, "AppendItemToArrayCmd\n"));
+    DBG(fprintf(stderr, "ToSimpleCmd\n"));
     CheckArgs(2,2,1,"handle");
 
     const char *handle = Tcl_GetString(objv[1]);
@@ -652,7 +653,7 @@ static int tjson_ToSimpleCmd(ClientData  clientData, Tcl_Interp *interp, int obj
 }
 
 static int tjson_ToTypedCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
-    DBG(fprintf(stderr, "AppendItemToArrayCmd\n"));
+    DBG(fprintf(stderr, "ToTypedCmd\n"));
     CheckArgs(2,2,1,"handle");
 
     const char *handle = Tcl_GetString(objv[1]);
@@ -834,7 +835,7 @@ static int tjson_TreeToJson(Tcl_Interp *interp, cJSON *item, int num_spaces, Tcl
 }
 
 static int tjson_ToJsonCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
-    DBG(fprintf(stderr, "AppendItemToArrayCmd\n"));
+    DBG(fprintf(stderr, "ToJsonCmd\n"));
     CheckArgs(2,2,1,"node_handle");
 
     const char *handle = Tcl_GetString(objv[1]);
@@ -856,7 +857,7 @@ static int tjson_ToJsonCmd(ClientData  clientData, Tcl_Interp *interp, int objc,
 }
 
 static int tjson_ToPrettyJsonCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
-    DBG(fprintf(stderr, "AppendItemToArrayCmd\n"));
+    DBG(fprintf(stderr, "ToPrettyJsonCmd\n"));
     CheckArgs(2,2,1,"handle");
 
     const char *handle = Tcl_GetString(objv[1]);
@@ -870,6 +871,37 @@ static int tjson_ToPrettyJsonCmd(ClientData  clientData, Tcl_Interp *interp, int
     }
     Tcl_DStringResult(interp, &ds);
     Tcl_DStringFree(&ds);
+    return TCL_OK;
+}
+
+static int tjson_QueryCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
+    DBG(fprintf(stderr, "AppendItemToArrayCmd\n"));
+    CheckArgs(3, 3, 1, "handle jsonpath");
+
+    const char *handle = Tcl_GetString(objv[1]);
+    cJSON *root_structure = tjson_GetInternalFromNode(handle);
+
+    int length;
+    const char *jsonpath = Tcl_GetStringFromObj(objv[2], &length);
+    jsonpath_result_t result;
+    result.k = 16;
+    result.items_length = 0;
+    result.items = (cJSON **)malloc(sizeof(cJSON *) * result.k);
+    if (TCL_OK != jsonpath_match(interp, jsonpath, length, root_structure, &result)) {
+        free(result.items);
+        return TCL_ERROR;
+    }
+    Tcl_Obj *listPtr = Tcl_NewListObj(0, NULL);
+    for (int i = 0; i < result.items_length; i++) {
+        char item_handle[80];
+        CMD_NAME(item_handle, result.items[i]);
+        tjson_RegisterNode(item_handle, result.items[i]);
+        // IMPORTANT: mark the node to unregister when cJSON_Delete is called
+        result.items[i]->flags |= VISIBLE_IN_TCL;
+        Tcl_ListObjAppendElement(interp, listPtr, Tcl_NewStringObj(item_handle, -1));
+    }
+    free(result.items);
+    Tcl_SetObjResult(interp, listPtr);
     return TCL_OK;
 }
 
@@ -1058,6 +1090,7 @@ int Tjson_Init(Tcl_Interp *interp) {
     Tcl_CreateObjCommand(interp, "::tjson::to_typed", tjson_ToTypedCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::to_json", tjson_ToJsonCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::to_pretty_json", tjson_ToPrettyJsonCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::query", tjson_QueryCmd, NULL, NULL);
 
     return Tcl_PkgProvide(interp, "tjson", XSTR(VERSION));
 }

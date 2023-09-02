@@ -1,0 +1,154 @@
+lappend auto_path ..
+package require tcltest
+package require tjson
+
+namespace import -force ::tcltest::test
+
+::tcltest::configure {*}$argv
+
+set json {
+    { "store": {
+       "book": [
+         { "category": "reference", "author": "Nigel Rees",
+           "title": "Sayings of the Century", "price": "8.95"  },
+         { "category": "fiction", "author": "Evelyn Waugh",
+           "title": "Sword of Honour", "price": "12.99" },
+         { "category": "fiction", "author": "Herman Melville",
+           "title": "Moby Dick", "isbn": "0-553-21311-3",
+           "price": "8.99" },
+         { "category": "fiction", "author": "J. R. R. Tolkien",
+           "title": "The Lord of the Rings", "isbn": "0-395-19395-8",
+           "price": "22.99" }
+       ],
+       "bicycle": { "color": "red", "price": "19.95" }
+     }
+   }
+}
+
+proc setup {} {
+    global handle
+    global json
+    set handle [::tjson::parse $json]
+}
+
+proc cleanup {} {
+    global handle
+    ::tjson::destroy $handle
+}
+
+test jsonpath-dot-notation {dot notation} -setup setup -cleanup cleanup -body {
+    global handle
+    set jsonpath {$.store..author}
+    set item_handles [::tjson::query $handle $jsonpath]
+    lmap x $item_handles {::tjson::to_simple $x}
+} -result {{Nigel Rees} {Evelyn Waugh} {Herman Melville} {J. R. R. Tolkien}}
+
+test jsonpath-bracket-notation {bracket notation} -setup setup -cleanup cleanup -body {
+    global handle
+    set jsonpath {$['store']['book'][0]['title']}
+    set item_handles [::tjson::query $handle $jsonpath]
+    lmap x $item_handles {::tjson::to_simple $x}
+} -result {{Sayings of the Century}}
+
+test jsonpath-mix-notation {mix of dot and bracket notations} -setup setup -cleanup cleanup -body {
+    global handle
+    set jsonpath {$['store']['book'][0]['title']}
+    set item_handles [::tjson::query $handle $jsonpath]
+    lmap x $item_handles {::tjson::to_simple $x}
+} -result {{Sayings of the Century}}
+
+test jsonpath-child-index-0 {} -setup setup -cleanup cleanup -body {
+    global handle
+    set jsonpath {$.store.book[0].title}
+    set item_handles [::tjson::query $handle $jsonpath]
+    lmap x $item_handles {::tjson::to_simple $x}
+} -result {{Sayings of the Century}}
+
+test jsonpath-child-index-1 {} -setup setup -cleanup cleanup -body {
+    global handle
+    set jsonpath {$.store.book[1].title}
+    set item_handles [::tjson::query $handle $jsonpath]
+    lmap x $item_handles {::tjson::to_simple $x}
+} -result {{Sword of Honour}}
+
+test jsonpath-child-index-2 {} -setup setup -cleanup cleanup -body {
+    global handle
+    set jsonpath {$.store.book[2].title}
+    set item_handles [::tjson::query $handle $jsonpath]
+    lmap x $item_handles {::tjson::to_simple $x}
+} -result {{Moby Dick}}
+
+test jsonpath-child-index-3 {} -setup setup -cleanup cleanup -body {
+    global handle
+    set jsonpath {$.store.book[3].title}
+    set item_handles [::tjson::query $handle $jsonpath]
+    lmap x $item_handles {::tjson::to_simple $x}
+} -result {{The Lord of the Rings}}
+
+test jsonpath-child-index-out-of-bounds-1 {} -setup setup -cleanup cleanup -body {
+    global handle
+    set jsonpath {$.store.book[4].title}
+    ::tjson::query $handle $jsonpath
+} -returnCodes error -result {Invalid JSONPath: child index out of bounds}
+
+test jsonpath-child-index-out-of-bounds-2 {} -setup setup -cleanup cleanup -body {
+    global handle
+    set jsonpath {$.store.book[-1].title}
+    ::tjson::query $handle $jsonpath
+} -returnCodes error -result {Invalid JSONPath: child index out of bounds}
+
+test jsonpath-child-indices-set {} -setup setup -cleanup cleanup -body {
+    global handle
+    set jsonpath {$['store'].book[1,3].title}
+    set item_handles [::tjson::query $handle $jsonpath]
+    lmap x $item_handles {::tjson::to_simple $x}
+} -result {{Sword of Honour} {The Lord of the Rings}}
+
+test jsonpath-child-indices-slice {} -setup setup -cleanup cleanup -body {
+    global handle
+    set jsonpath {$['store'].book[1:3].title}
+    set item_handles [::tjson::query $handle $jsonpath]
+    lmap x $item_handles {::tjson::to_simple $x}
+} -result {{Sword of Honour} {Moby Dick}}
+
+test jsonpath-child-indices-slice-missing-start {} -setup setup -cleanup cleanup -body {
+    global handle
+    set jsonpath {$['store'].book[:3].title}
+    set item_handles [::tjson::query $handle $jsonpath]
+    lmap x $item_handles {::tjson::to_simple $x}
+} -result {{Sayings of the Century} {Sword of Honour} {Moby Dick}}
+
+test jsonpath-child-indices-slice-missing-end {} -setup setup -cleanup cleanup -body {
+    global handle
+    set jsonpath {$['store'].book[1:].title}
+    set item_handles [::tjson::query $handle $jsonpath]
+    lmap x $item_handles {::tjson::to_simple $x}
+} -result {{Sword of Honour} {Moby Dick} {The Lord of the Rings}}
+
+test jsonpath-child-indices-slice-last-n-elements {} -setup setup -cleanup cleanup -body {
+    global handle
+    set jsonpath {$['store'].book[-2:].title}
+    set item_handles [::tjson::query $handle $jsonpath]
+    lmap x $item_handles {::tjson::to_simple $x}
+} -result {{Moby Dick} {The Lord of the Rings}}
+
+test jsonpath-wildcard-index {} -setup setup -cleanup cleanup -body {
+    global handle
+    set jsonpath {$['store'].book[*].title}
+    set item_handles [::tjson::query $handle $jsonpath]
+    lmap x $item_handles {::tjson::to_simple $x}
+} -result {{Sayings of the Century} {Sword of Honour} {Moby Dick} {The Lord of the Rings}}
+
+test jsonpath-wildcard-index-empty-results {} -setup setup -cleanup cleanup -body {
+    global handle
+    set jsonpath {$['store'].book[*].first_name}
+    set item_handles [::tjson::query $handle $jsonpath]
+    lmap x $item_handles {::tjson::to_simple $x}
+} -result {}
+
+test jsonpath-invalid-syntax-1 {} -setup setup -cleanup cleanup -body {
+    global handle
+    set jsonpath {$['store'].book[*.title}
+    set item_handles [::tjson::query $handle $jsonpath]
+    lmap x $item_handles {::tjson::to_simple $x}
+} -returnCodes error -result {Invalid JSONPath: ']' expected}

@@ -96,6 +96,24 @@ make install
   - returns a JSON string for the given node
 * **::tjson::to_pretty_json** *handle*
   - returns a prettified JSON string for the given node
+* **::tjson::query** *handle* *jsonpath*
+  - returns a list of handles for the given JSON path expression
+
+## JSONPath Syntax
+
+| JSONPath Expression | Description                                                                                               |
+|---------------------|-----------------------------------------------------------------------------------------------------------|
+| $                   | The root object or array                                                                                  |
+| .property           | Selects the specified property in a parent object                                                         |
+| ['property']        | Selects the specified property in a parent object. Be sure to put single quotes around the property name. |
+| [n]                 | Selects the *n*-th element from an array. Indexes are 0-based.                                            |
+| [start:end]         | Selects array elements from the start index and up to, but not including, end index. |
+| [start:]            | Selects array elements from the start index to the end of the array. |
+| [:end]              | Selects array elements from the first element up to, but not including, the end index. |
+| [-n:]               | Selects the last *n* elements in the array. |
+
+
+
 
 
 
