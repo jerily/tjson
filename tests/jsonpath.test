@@ -159,3 +159,17 @@ test jsonpath-invalid-syntax-2 {} -setup setup -cleanup cleanup -body {
     set item_handles [::tjson::query $handle $jsonpath]
     lmap x $item_handles {::tjson::to_simple $x}
 } -returnCodes error -result {Invalid JSONPath: invalid syntax}
+
+test jsonpath-invalid-syntax-3 {} -setup setup -cleanup cleanup -body {
+    global handle
+    set jsonpath {$['store'].book*.title}
+    set item_handles [::tjson::query $handle $jsonpath]
+    lmap x $item_handles {::tjson::to_simple $x}
+} -returnCodes error -result {Invalid JSONPath: invalid syntax}
+
+test jsonpath-invalid-syntax-4 {} -setup setup -cleanup cleanup -body {
+    global handle
+    set jsonpath {$['store'].book.$.title}
+    set item_handles [::tjson::query $handle $jsonpath]
+    lmap x $item_handles {::tjson::to_simple $x}
+} -returnCodes error -result {Invalid JSONPath: '.' must be followed by a child name or wildcard}
