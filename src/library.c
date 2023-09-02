@@ -102,6 +102,9 @@ tjson_GetInternalFromNode(const char *name) {
 
 static Tcl_Obj *tjson_TreeToSimple(Tcl_Interp *interp, cJSON *item) {
 
+    double d;
+    Tcl_Obj *listPtr;
+    Tcl_Obj *dictPtr;
     switch ((item->type) & 0xFF)
     {
         case cJSON_NULL:
@@ -111,7 +114,7 @@ static Tcl_Obj *tjson_TreeToSimple(Tcl_Interp *interp, cJSON *item) {
         case cJSON_True:
             return Tcl_NewBooleanObj(1);
         case cJSON_Number:
-            double d = item->valuedouble;
+            d = item->valuedouble;
             if (isnan(d) || isinf(d)) {
                 return Tcl_NewStringObj("", 0);
             } else if(d == (double)item->valueint) {
@@ -132,7 +135,7 @@ static Tcl_Obj *tjson_TreeToSimple(Tcl_Interp *interp, cJSON *item) {
         case cJSON_String:
             return Tcl_NewStringObj(item->valuestring, -1);
         case cJSON_Array:
-            Tcl_Obj *listPtr = Tcl_NewListObj(0, NULL);
+            listPtr = Tcl_NewListObj(0, NULL);
             cJSON *current_element = item->child;
             while (current_element != NULL) {
                 Tcl_ListObjAppendElement(interp, listPtr, tjson_TreeToSimple(interp, current_element));
@@ -140,7 +143,7 @@ static Tcl_Obj *tjson_TreeToSimple(Tcl_Interp *interp, cJSON *item) {
             }
             return listPtr;
         case cJSON_Object:
-            Tcl_Obj *dictPtr = Tcl_NewDictObj();
+            dictPtr = Tcl_NewDictObj();
             cJSON *current_item = item->child;
             while (current_item) {
                 Tcl_DictObjPut(
@@ -158,7 +161,10 @@ static Tcl_Obj *tjson_TreeToSimple(Tcl_Interp *interp, cJSON *item) {
 
 static Tcl_Obj *tjson_TreeToTyped(Tcl_Interp *interp, cJSON *item) {
 
+    double d;
     Tcl_Obj *resultPtr = Tcl_NewListObj(0, NULL);
+    Tcl_Obj *listPtr;
+    Tcl_Obj *dictPtr;
     switch ((item->type) & 0xFF)
     {
         case cJSON_NULL:
@@ -174,7 +180,7 @@ static Tcl_Obj *tjson_TreeToTyped(Tcl_Interp *interp, cJSON *item) {
             Tcl_ListObjAppendElement(interp, resultPtr, Tcl_NewBooleanObj(1));
             return resultPtr;
         case cJSON_Number:
-            double d = item->valuedouble;
+            d = item->valuedouble;
             if (isnan(d) || isinf(d)) {
                 Tcl_ListObjAppendElement(interp, resultPtr, Tcl_NewStringObj("S", 1));
                 Tcl_ListObjAppendElement(interp, resultPtr, Tcl_NewStringObj("", 0));
@@ -206,7 +212,7 @@ static Tcl_Obj *tjson_TreeToTyped(Tcl_Interp *interp, cJSON *item) {
             Tcl_ListObjAppendElement(interp, resultPtr, Tcl_NewStringObj(item->valuestring, -1));
             return resultPtr;
         case cJSON_Array:
-            Tcl_Obj *listPtr = Tcl_NewListObj(0, NULL);
+            listPtr = Tcl_NewListObj(0, NULL);
             cJSON *current_element = item->child;
             while (current_element != NULL) {
                 Tcl_ListObjAppendElement(interp, listPtr, tjson_TreeToTyped(interp, current_element));
@@ -216,7 +222,7 @@ static Tcl_Obj *tjson_TreeToTyped(Tcl_Interp *interp, cJSON *item) {
             Tcl_ListObjAppendElement(interp, resultPtr, listPtr);
             return resultPtr;
         case cJSON_Object:
-            Tcl_Obj *dictPtr = Tcl_NewDictObj();
+            dictPtr = Tcl_NewDictObj();
             cJSON *current_item = item->child;
             while (current_item) {
                 Tcl_DictObjPut(
@@ -327,6 +333,9 @@ static int tjson_CreateItemFromSpec(Tcl_Interp *interp, Tcl_Obj *specPtr, cJSON 
     Tcl_ListObjIndex(interp, specPtr, 0, &typePtr);
     Tcl_ListObjIndex(interp, specPtr, 1, &valuePtr);
 
+    double value_double;
+    cJSON *obj;
+    cJSON *arr;
     int typeLength;
     const char *type = Tcl_GetStringFromObj(typePtr, &typeLength);
     switch (type[0]) {
@@ -334,7 +343,7 @@ static int tjson_CreateItemFromSpec(Tcl_Interp *interp, Tcl_Obj *specPtr, cJSON 
             *item = cJSON_CreateString(Tcl_GetString(valuePtr));
             return TCL_OK;
         case 'N':
-            double value_double;
+            value_double;
             Tcl_GetDoubleFromObj(interp, valuePtr, &value_double);
             *item = cJSON_CreateNumber(value_double);
             return TCL_OK;
@@ -349,7 +358,7 @@ static int tjson_CreateItemFromSpec(Tcl_Interp *interp, Tcl_Obj *specPtr, cJSON 
                 return TCL_OK;
             }
         case 'M':
-            cJSON *obj = cJSON_CreateObject();
+            obj = cJSON_CreateObject();
             // iterate "valuePtr" as a dict and add each item to the object "obj"
             Tcl_DictSearch search;
             Tcl_Obj *key, *elemSpecPtr;
@@ -368,7 +377,7 @@ static int tjson_CreateItemFromSpec(Tcl_Interp *interp, Tcl_Obj *specPtr, cJSON 
             *item = obj;
             return TCL_OK;
         case 'L':
-            cJSON *arr = cJSON_CreateArray();
+            arr = cJSON_CreateArray();
             // iterate "valuePtr" as a list and add each item to the object "arr"
             int listLength;
             Tcl_ListObjLength(interp, valuePtr, &listLength);
@@ -709,6 +718,7 @@ static int tjson_EscapeJsonString(Tcl_Obj *objPtr, Tcl_DString *dsPtr) {
 }
 
 static int tjson_TreeToJson(Tcl_Interp *interp, cJSON *item, int num_spaces, Tcl_DString *dsPtr) {
+    double d;
     switch ((item->type) & 0xFF)
     {
         case cJSON_NULL:
@@ -721,7 +731,7 @@ static int tjson_TreeToJson(Tcl_Interp *interp, cJSON *item, int num_spaces, Tcl
             Tcl_DStringAppend(dsPtr, "true", 4);
             return TCL_OK;
         case cJSON_Number:
-            double d = item->valuedouble;
+            d = item->valuedouble;
             if (isnan(d) || isinf(d)) {
                 Tcl_DStringAppend(dsPtr, "null", 4);
                 return TCL_OK;
@@ -969,6 +979,8 @@ static int serialize(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_DString *dsPtr) {
     Tcl_ListObjIndex(interp, specPtr, 1, &valuePtr);
     int typeLength;
     const char *type = Tcl_GetStringFromObj(typePtr, &typeLength);
+    int numstr_length;
+    const char *numstr;
     switch(type[0]) {
         case 'S':
             Tcl_DStringAppend(dsPtr, "\"", 1);
@@ -976,8 +988,7 @@ static int serialize(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_DString *dsPtr) {
             Tcl_DStringAppend(dsPtr, "\"", 1);
             break;
         case 'N':
-            int numstr_length;
-            const char *numstr = Tcl_GetStringFromObj(valuePtr, &numstr_length);
+            numstr = Tcl_GetStringFromObj(valuePtr, &numstr_length);
             Tcl_DStringAppend(dsPtr, numstr, numstr_length);
             break;
         case 'B':
