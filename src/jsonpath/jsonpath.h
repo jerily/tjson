@@ -1,8 +1,6 @@
 #ifndef TJSON_JSONPATH_H
 #define TJSON_JSONPATH_H
 
-#include <string.h>
-#include <stdlib.h>
 #include <tcl.h>
 #include "../cJSON/cJSON.h"
 

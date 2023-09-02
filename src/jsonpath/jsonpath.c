@@ -1,3 +1,6 @@
+#include <ctype.h>
+#include <string.h>
+#include <stdlib.h>
 #include "jsonpath.h"
 
 #ifdef DEBUG
@@ -5,6 +8,9 @@
 #else
 # define DBG(x)
 #endif
+
+#define CHARTYPE(what, c) (is ## what ((int)((unsigned char)(c))))
+#define PROPCHAR(c) ((c) != '[' && (c) != ']' && (c) != '.' && (c) != '*' && (c) != '\'' && (c) != '$')
 
 typedef enum {
     ROOT,
@@ -88,6 +94,8 @@ static void jsonpath_insert_node_to_list(jsonpath_node_t *node, jsonpath_node_t 
 }
 static int jsonpath_parse(Tcl_Interp *interp, const char *jsonpath, int length, jsonpath_node_t **nodes) {
 
+    DBG(fprintf(stderr, "jsonpath_parse: %.*s\n", length, jsonpath));
+
     // "nodes" is a list of jsonpath_node_t pointers
     // "root" is the root node of the jsonpath
     // "curr" is the current position in the jsonpath
@@ -135,8 +143,13 @@ static int jsonpath_parse(Tcl_Interp *interp, const char *jsonpath, int length, 
 
                     // parse child name
                     const char *p = curr + 2;
-                    while (p < end && p[0] != '.' && p[0] != '[') {
+                    while (p < end && PROPCHAR(p[0])) {
                         p++;
+                    }
+                    if (p == curr + 2) {
+                        jsonpath_free_list(*nodes);
+                        Tcl_SetObjResult(interp, Tcl_NewStringObj("Invalid JSONPath: '..' must be followed by a child name", -1));
+                        return TCL_ERROR;
                     }
                     DBG(fprintf(stderr, "child name: %.*s\n", (int) (p - curr - 2), curr + 2));
                     node = jsonpath_node_new(CHILD_NAME);
@@ -149,7 +162,7 @@ static int jsonpath_parse(Tcl_Interp *interp, const char *jsonpath, int length, 
                     jsonpath_insert_node_to_list(node, nodes, &nodes_length);
                 } else {
                     const char *p = curr + 1;
-                    while (p < end && p[0] != '.' && p[0] != '[') {
+                    while (p < end && PROPCHAR(p[0])) {
                         p++;
                     }
                     if (p == curr + 1) {
@@ -190,7 +203,7 @@ static int jsonpath_parse(Tcl_Interp *interp, const char *jsonpath, int length, 
                     } else {
                         // if "curr" is equal to "['name']" then it's a "CHILD_NAME"
                         const char *p = curr + 2;
-                        while (p < end && p[0] != '\'') {
+                        while (p < end && p[0] != '\'' && PROPCHAR(p[0])) {
                             p++;
                         }
                         if (p == end) {
@@ -207,6 +220,7 @@ static int jsonpath_parse(Tcl_Interp *interp, const char *jsonpath, int length, 
                         }
                         jsonpath_node_t *node = jsonpath_node_new(CHILD_NAME);
                         node->data.child_name = strndup(curr + 2, p - curr - 2);
+                        DBG(fprintf(stderr, "child name: %s\n", node->data.child_name));
                         jsonpath_insert_node_to_list(node, nodes, &nodes_length);
                         curr = p + 2;
                     }
@@ -316,11 +330,13 @@ static int jsonpath_parse(Tcl_Interp *interp, const char *jsonpath, int length, 
                 }
                 break;
             default:
-                curr++;
-                break;
+                jsonpath_free_list(*nodes);
+                Tcl_SetObjResult(interp, Tcl_NewStringObj("Invalid JSONPath: invalid syntax", -1));
+                return TCL_ERROR;
         }
     }
     *nodes = reverse_linked_list(*nodes);
+    DBG(fprintf(stderr, "done\n"));
     return TCL_OK;
 }
 
@@ -357,7 +373,7 @@ static int jsonpath_eval(Tcl_Interp *interp, jsonpath_node_t *node, cJSON *root,
                 return TCL_OK;
             }
         case CHILD_NAME:
-            DBG(fprintf(stderr, "eval,child_name,next: %p\n", node->next));
+            DBG(fprintf(stderr, "eval,child_name: %s\n", node->data.child_name));
             item = cJSON_GetObjectItemCaseSensitive(root, node->data.child_name);
             if (item == NULL) {
                 return TCL_OK;
