@@ -1115,6 +1115,129 @@ static int tjson_EscapeJsonStringCmd(ClientData  clientData, Tcl_Interp *interp,
     return TCL_OK;
 }
 
+static int tjson_CustomToTyped(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj **resultPtr) {
+    int length;
+    Tcl_ListObjLength(interp, specPtr, &length);
+    if (length != 3) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid triple notation spec", -1));
+        return TCL_ERROR;  /* invalid spec length */
+    }
+    Tcl_Obj *namePtr, *typePtr, *valuePtr;
+    Tcl_ListObjIndex(interp, specPtr, 0, &namePtr);
+    Tcl_ListObjIndex(interp, specPtr, 1, &typePtr);
+    Tcl_ListObjIndex(interp, specPtr, 2, &valuePtr);
+    int type_length;
+    const char *type = Tcl_GetStringFromObj(typePtr, &type_length);
+    int flag;
+    double double_value;
+    int int_value;
+    Tcl_Obj *listPtr;
+    switch(type[0]) {
+        case 's':
+            *resultPtr = Tcl_NewListObj(0, NULL);
+            Tcl_ListObjAppendElement(interp, *resultPtr, Tcl_NewStringObj("S", -1));
+            Tcl_ListObjAppendElement(interp, *resultPtr, Tcl_DuplicateObj(valuePtr));
+            break;
+        case 'd':
+            if (type_length == 6 && 0 == strcmp("double", type)) {
+                if (TCL_OK != Tcl_GetDoubleFromObj(interp, valuePtr, &double_value)) {
+                    Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid double", -1));
+                    return TCL_ERROR;
+                }
+                *resultPtr = Tcl_NewListObj(0, NULL);
+                Tcl_ListObjAppendElement(interp, *resultPtr, Tcl_NewStringObj("N", -1));
+                Tcl_ListObjAppendElement(interp, *resultPtr, Tcl_NewDoubleObj(double_value));
+            } else if ((type_length == 8 && 0 == strcmp("document", type)) || (type_length == 3 && 0 == strcmp("doc", type))) {
+                *resultPtr = Tcl_NewListObj(0, NULL);
+                Tcl_ListObjAppendElement(interp, *resultPtr, Tcl_NewStringObj("M", -1));
+                Tcl_Obj *dictPtr = Tcl_NewDictObj();
+                for (int i = 0; i < length; i++) {
+                    Tcl_Obj *elemPtr;
+                    Tcl_ListObjIndex(interp, valuePtr, i, &elemPtr);
+                    int elem_length;
+                    if (TCL_OK != Tcl_ListObjLength(interp, elemPtr, &elem_length) || elem_length != 3) {
+                        Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid document", -1));
+                        return TCL_ERROR;
+                    }
+                    Tcl_Obj *keyPtr;
+                    Tcl_ListObjIndex(interp, elemPtr, 0, &keyPtr);
+                    Tcl_Obj *convertedElemPtr;
+                    if (TCL_OK != tjson_CustomToTyped(interp, elemPtr, &convertedElemPtr)) {
+                        return TCL_ERROR;
+                    }
+                    Tcl_DictObjPut(interp, dictPtr, keyPtr, convertedElemPtr);
+                }
+                Tcl_ListObjAppendElement(interp, *resultPtr, dictPtr);
+            } else if (type_length == 4 && 0 == strcmp("date", type)) {
+                *resultPtr = Tcl_NewListObj(0, NULL);
+                Tcl_ListObjAppendElement(interp, *resultPtr, Tcl_NewStringObj("S", -1));
+                Tcl_ListObjAppendElement(interp, *resultPtr, Tcl_DuplicateObj(valuePtr));
+            } else {
+                Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid type", -1));
+                return TCL_ERROR;
+            }
+            break;
+        case 'i':
+            if (type_length == 1 || (type_length == 5 && 0 == strcmp("int32", type)) || (type_length == 5 && 0 == strcmp("int64", type))) {
+                if (TCL_OK != Tcl_GetIntFromObj(interp, valuePtr, &int_value)) {
+                    Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid int", -1));
+                    return TCL_ERROR;
+                }
+                *resultPtr = Tcl_NewListObj(0, NULL);
+                Tcl_ListObjAppendElement(interp, *resultPtr, Tcl_NewStringObj("N", -1));
+                Tcl_ListObjAppendElement(interp, *resultPtr, Tcl_NewIntObj(int_value));
+            } else {
+                Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid type", -1));
+                return TCL_ERROR;
+            }
+            break;
+        case 'b':
+            if (TCL_OK != Tcl_GetBooleanFromObj(interp, valuePtr, &flag)) {
+                Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid boolean", -1));
+                return TCL_ERROR;
+            }
+            *resultPtr = Tcl_NewListObj(0, NULL);
+            Tcl_ListObjAppendElement(interp, *resultPtr, Tcl_NewStringObj("BOOL", -1));
+            Tcl_ListObjAppendElement(interp, *resultPtr, Tcl_NewBooleanObj(flag));
+            break;
+        case 'a':
+            if (TCL_OK != Tcl_ListObjLength(interp, valuePtr, &length)) {
+                Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid array", -1));
+                return TCL_ERROR;
+            }
+            *resultPtr = Tcl_NewListObj(0, NULL);
+            Tcl_ListObjAppendElement(interp, *resultPtr, Tcl_NewStringObj("L", -1));
+            listPtr = Tcl_NewListObj(0, NULL);
+            for (int i = 0; i < length; i++) {
+                Tcl_Obj *elemPtr;
+                Tcl_ListObjIndex(interp, valuePtr, i, &elemPtr);
+                Tcl_Obj *convertedElemPtr;
+                if (TCL_OK != tjson_CustomToTyped(interp, elemPtr, &convertedElemPtr)) {
+                    return TCL_ERROR;
+                }
+                Tcl_ListObjAppendElement(interp, listPtr, convertedElemPtr);
+            }
+            Tcl_ListObjAppendElement(interp, *resultPtr, listPtr);
+            break;
+        default:
+            Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid type in spec", -1));
+            return TCL_ERROR;  /* invalid type */
+    }
+    return TCL_OK;
+}
+
+static int tjson_CustomToTypedCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
+    DBG(fprintf(stderr, "CustomToTypedCmd\n"));
+    CheckArgs(2, 2, 1, "triple_notation_spec");
+
+    Tcl_Obj *resultPtr = NULL;
+    if (TCL_OK != tjson_CustomToTyped(interp, objv[1], &resultPtr)) {
+        return TCL_ERROR;
+    }
+    Tcl_SetObjResult(interp, resultPtr);
+    return TCL_OK;
+}
+
 static void tjson_ExitHandler(ClientData unused) {
 }
 
@@ -1164,6 +1287,8 @@ int Tjson_Init(Tcl_Interp *interp) {
     Tcl_CreateObjCommand(interp, "::tjson::to_json", tjson_ToJsonCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::to_pretty_json", tjson_ToPrettyJsonCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::query", tjson_QueryCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::custom_to_typed", tjson_CustomToTypedCmd, NULL, NULL);
+//    Tcl_CreateObjCommand(interp, "::tjson::typed_to_custom", tjson_TypedToCustomCmd, NULL, NULL);
 
     return Tcl_PkgProvide(interp, "tjson", XSTR(VERSION));
 }
