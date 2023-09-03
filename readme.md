@@ -99,6 +99,17 @@ make install
 * **::tjson::query** *handle* *jsonpath*
   - returns a list of handles for the given JSON path expression
 
+## Typed TCL Notation/Spec
+
+| JSON Type | Spec Type | Example                                                                   |
+|-----------|-----------|---------------------------------------------------------------------------|
+| Object    | M         | {M {a {N 1} b {BOOL 1} c {L {{N 1} {N 2} {N 3}}}} |
+| Array     | L         | {L {{N 1} {N 2} {N 3}}}<br/>{L {{S "this"} {S "is"} {S "a"} {S "test"}}}      |
+| String    | S         | {S a}                                                                     |
+| Number    | N         | {N 1}                                                                     |
+| Boolean   | BOOL      | {BOOL 1}                                                                  |
+
+
 ## JSONPath Syntax
 
 | JSONPath Expression | Description                                                                                               |
