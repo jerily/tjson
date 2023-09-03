@@ -957,7 +957,7 @@ static int serialize_map(Tcl_Interp *interp, Tcl_Obj *dictPtr, Tcl_DString *dsPt
         }
         Tcl_DStringAppend(dsPtr, "\"", 1);
         tjson_EscapeJsonString(key, dsPtr);
-        Tcl_DStringAppend(dsPtr, "\": ", 3);
+        Tcl_DStringAppend(dsPtr, "\":", 2);
         if (TCL_OK != serialize(interp, elemSpecPtr, dsPtr)) {
             return TCL_ERROR;
         }

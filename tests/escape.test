@@ -1,0 +1,10 @@
+package require tcltest
+package require tjson
+
+namespace import -force ::tcltest::test
+
+::tcltest::configure {*}$argv
+
+test escape_json_string-1 {simple string} {
+    ::tjson::escape_json_string "hello\"world\n"
+} {hello\"world\n}
