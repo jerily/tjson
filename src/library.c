@@ -310,6 +310,10 @@ static int tjson_SizeCmd(ClientData  clientData, Tcl_Interp *interp, int objc, T
 
     const char *handle = Tcl_GetString(objv[1]);
     cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
 
     if (!cJSON_IsArray(root_structure) && !cJSON_IsObject(root_structure)) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("node is not an array or object", -1));
@@ -422,6 +426,10 @@ static int tjson_AddItemToObjectCmd(ClientData  clientData, Tcl_Interp *interp, 
 
     const char *handle = Tcl_GetString(objv[1]);
     cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
 
     if (!cJSON_IsObject(root_structure)) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("node is not an object", -1));
@@ -445,6 +453,10 @@ static int tjson_ReplaceItemInObjectCmd(ClientData  clientData, Tcl_Interp *inte
 
     const char *handle = Tcl_GetString(objv[1]);
     cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
 
     if (!cJSON_IsObject(root_structure)) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("node is not an object", -1));
@@ -468,6 +480,10 @@ static int tjson_DeleteItemFromObjectCmd(ClientData  clientData, Tcl_Interp *int
 
     const char *handle = Tcl_GetString(objv[1]);
     cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
 
     if (!cJSON_IsObject(root_structure)) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("node is not an object", -1));
@@ -484,6 +500,10 @@ static int tjson_GetObjectItemCmd(ClientData  clientData, Tcl_Interp *interp, in
 
     const char *handle = Tcl_GetString(objv[1]);
     cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
 
     if (!cJSON_IsObject(root_structure)) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("node is not an object", -1));
@@ -512,6 +532,10 @@ static int tjson_AddItemToArrayCmd(ClientData  clientData, Tcl_Interp *interp, i
 
     const char *handle = Tcl_GetString(objv[1]);
     cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
 
     if (!cJSON_IsArray(root_structure)) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("node is not an array", -1));
@@ -533,6 +557,11 @@ static int tjson_InsertItemInArrayCmd(ClientData  clientData, Tcl_Interp *interp
 
     const char *handle = Tcl_GetString(objv[1]);
     cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
+
     if (!cJSON_IsArray(root_structure)) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("node is not an array", -1));
         return TCL_ERROR;
@@ -564,6 +593,11 @@ static int tjson_ReplaceItemInArrayCmd(ClientData  clientData, Tcl_Interp *inter
 
     const char *handle = Tcl_GetString(objv[1]);
     cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
+
     if (!cJSON_IsArray(root_structure)) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("node is not an array", -1));
         return TCL_ERROR;
@@ -595,6 +629,11 @@ static int tjson_DeleteItemFromArrayCmd(ClientData  clientData, Tcl_Interp *inte
 
     const char *handle = Tcl_GetString(objv[1]);
     cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
+
     if (!cJSON_IsArray(root_structure)) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("node is not an array", -1));
         return TCL_ERROR;
@@ -622,6 +661,11 @@ static int tjson_GetArrayItemCmd(ClientData  clientData, Tcl_Interp *interp, int
 
     const char *handle = Tcl_GetString(objv[1]);
     cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
+
     if (!cJSON_IsArray(root_structure)) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("node is not an array", -1));
         return TCL_ERROR;
@@ -656,6 +700,11 @@ static int tjson_ToSimpleCmd(ClientData  clientData, Tcl_Interp *interp, int obj
 
     const char *handle = Tcl_GetString(objv[1]);
     cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
+
     Tcl_Obj *resultPtr = tjson_TreeToSimple(interp, root_structure);
     Tcl_SetObjResult(interp, resultPtr);
     return TCL_OK;
@@ -667,6 +716,11 @@ static int tjson_ToTypedCmd(ClientData  clientData, Tcl_Interp *interp, int objc
 
     const char *handle = Tcl_GetString(objv[1]);
     cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
+
     Tcl_Obj *resultPtr = tjson_TreeToTyped(interp, root_structure);
     Tcl_SetObjResult(interp, resultPtr);
     return TCL_OK;
@@ -872,6 +926,10 @@ static int tjson_ToPrettyJsonCmd(ClientData  clientData, Tcl_Interp *interp, int
 
     const char *handle = Tcl_GetString(objv[1]);
     cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
 
     Tcl_DString ds;
     Tcl_DStringInit(&ds);
@@ -890,6 +948,10 @@ static int tjson_QueryCmd(ClientData  clientData, Tcl_Interp *interp, int objc, 
 
     const char *handle = Tcl_GetString(objv[1]);
     cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
 
     int length;
     const char *jsonpath = Tcl_GetStringFromObj(objv[2], &length);

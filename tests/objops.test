@@ -1,0 +1,60 @@
+package require tcltest
+package require tjson
+
+namespace import -force ::tcltest::test
+
+::tcltest::configure {*}$argv
+
+proc setup {} {
+    global node_handle
+    set node_handle [::tjson::parse {{"a": 1, "b": true, "c": [1, 2, 3], "d": {"d1":"a", "d2":"b"}}}]
+}
+
+proc cleanup {} {
+    global node_handle
+    ::tjson::destroy $node_handle
+}
+
+test size-1 {size of a json object} -setup setup -cleanup cleanup -body {
+    global node_handle
+    ::tjson::size $node_handle
+} -result 4
+
+test add_item_to_object-1 {add a few items to a json object} -setup setup -cleanup cleanup -body {
+    global node_handle
+    ::tjson::add_item_to_object $node_handle e [list N 4]
+    ::tjson::add_item_to_object $node_handle f [list L [list {N 5} {N 6} {N 7}]]
+    ::tjson::add_item_to_object $node_handle g [list M [list a {S "hello world"} b {N 9}]]
+    ::tjson::to_simple $node_handle
+} -result {a 1 b 1 c {1 2 3} d {d1 a d2 b} e 4 f {5 6 7} g {a {hello world} b 9}}
+
+test replace_item_in_object-1 {replace an item in a json object with a new number value} -setup setup -cleanup cleanup -body {
+    global node_handle
+    ::tjson::replace_item_in_object $node_handle a [list N 2]
+    ::tjson::to_simple $node_handle
+} -result {a 2 b 1 c {1 2 3} d {d1 a d2 b}}
+
+test replace_item_in_object-2 {replace an item in a json object with a string value} -setup setup -cleanup cleanup -body {
+    global node_handle
+    ::tjson::replace_item_in_object $node_handle b [list S "this is a test"]
+    ::tjson::to_simple $node_handle
+} -result {a 1 b {this is a test} c {1 2 3} d {d1 a d2 b}}
+
+test delete_item_from_object-1 {delete an item from a json object} -setup setup -cleanup cleanup -body {
+    global node_handle
+    ::tjson::delete_item_from_object $node_handle c
+    ::tjson::to_simple $node_handle
+} -result {a 1 b 1 d {d1 a d2 b}}
+
+test get_object_item-1 {get an item from a json object} -setup setup -cleanup cleanup -body {
+    global node_handle
+    set item_handle [::tjson::get_object_item $node_handle d]
+    ::tjson::to_simple $item_handle
+} -result {d1 a d2 b}
+
+test error_after_deletion-1 {delete an item from a json object and then try to serialize it} -setup setup -cleanup cleanup -body {
+    global node_handle
+    set item_handle [::tjson::get_object_item $node_handle d]
+    ::tjson::delete_item_from_object $node_handle d
+    ::tjson::to_simple $item_handle
+} -returnCodes error -result {node not found}
