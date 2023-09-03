@@ -1,6 +1,6 @@
 # tjson
 
-TCL/C extension for parsing and manipulating JSON.
+TCL/C extension for parsing, manipulating, and querying JSON.
 
 ## Examples
 ```
