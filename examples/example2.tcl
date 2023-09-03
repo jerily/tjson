@@ -33,7 +33,7 @@ puts simple,after,after=[::tjson::to_simple $node_handle]
 set item_handle [::tjson::get_array_item $node_handle 2]
 puts json,get_array_item,2=[::tjson::to_json $item_handle]
 ::tjson::destroy $node_handle
-if { [catch { puts json,get_object_item,d=[::tjson::to_json $item_handle] } errmsg ] } {
+if { [catch { puts json,get_array_item,d=[::tjson::to_json $item_handle] } errmsg ] } {
     puts "expected error: $errmsg"
 }
 
