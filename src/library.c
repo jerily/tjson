@@ -1132,6 +1132,7 @@ static int tjson_CustomToTyped(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj **r
     double double_value;
     int int_value;
     Tcl_Obj *listPtr;
+    Tcl_Obj *dictPtr;
     switch(type[0]) {
         case 's':
             *resultPtr = Tcl_NewListObj(0, NULL);
@@ -1139,7 +1140,7 @@ static int tjson_CustomToTyped(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj **r
             Tcl_ListObjAppendElement(interp, *resultPtr, Tcl_DuplicateObj(valuePtr));
             break;
         case 'd':
-            if (type_length == 6 && 0 == strcmp("double", type)) {
+            if ((type_length == 6 && 0 == strcmp("double", type)) || (type_length == 2 && 0 == strcmp("do", type))) {
                 if (TCL_OK != Tcl_GetDoubleFromObj(interp, valuePtr, &double_value)) {
                     Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid double", -1));
                     return TCL_ERROR;
@@ -1150,7 +1151,8 @@ static int tjson_CustomToTyped(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj **r
             } else if ((type_length == 8 && 0 == strcmp("document", type)) || (type_length == 3 && 0 == strcmp("doc", type))) {
                 *resultPtr = Tcl_NewListObj(0, NULL);
                 Tcl_ListObjAppendElement(interp, *resultPtr, Tcl_NewStringObj("M", -1));
-                Tcl_Obj *dictPtr = Tcl_NewDictObj();
+                dictPtr = Tcl_NewDictObj();
+                Tcl_Obj *subDictPtr = Tcl_NewDictObj();
                 for (int i = 0; i < length; i++) {
                     Tcl_Obj *elemPtr;
                     Tcl_ListObjIndex(interp, valuePtr, i, &elemPtr);
@@ -1165,8 +1167,12 @@ static int tjson_CustomToTyped(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj **r
                     if (TCL_OK != tjson_CustomToTyped(interp, elemPtr, &convertedElemPtr)) {
                         return TCL_ERROR;
                     }
-                    Tcl_DictObjPut(interp, dictPtr, keyPtr, convertedElemPtr);
+                    Tcl_DictObjPut(interp, subDictPtr, keyPtr, convertedElemPtr);
                 }
+                Tcl_Obj *subListPtr = Tcl_NewListObj(0, NULL);
+                Tcl_ListObjAppendElement(interp, subListPtr, Tcl_NewStringObj("M", -1));
+                Tcl_ListObjAppendElement(interp, subListPtr, subDictPtr);
+                Tcl_DictObjPut(interp, dictPtr, namePtr, subListPtr);
                 Tcl_ListObjAppendElement(interp, *resultPtr, dictPtr);
             } else if (type_length == 4 && 0 == strcmp("date", type)) {
                 *resultPtr = Tcl_NewListObj(0, NULL);
@@ -1206,18 +1212,35 @@ static int tjson_CustomToTyped(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj **r
                 return TCL_ERROR;
             }
             *resultPtr = Tcl_NewListObj(0, NULL);
-            Tcl_ListObjAppendElement(interp, *resultPtr, Tcl_NewStringObj("L", -1));
+            Tcl_ListObjAppendElement(interp, *resultPtr, Tcl_NewStringObj("M", -1));
+            Tcl_Obj *arrListPtr = Tcl_NewListObj(0, NULL);
+            Tcl_ListObjAppendElement(interp, arrListPtr, Tcl_NewStringObj("L", -1));
             listPtr = Tcl_NewListObj(0, NULL);
             for (int i = 0; i < length; i++) {
                 Tcl_Obj *elemPtr;
                 Tcl_ListObjIndex(interp, valuePtr, i, &elemPtr);
+                int elem_length;
+                if (TCL_OK != Tcl_ListObjLength(interp, elemPtr, &elem_length) || elem_length != 3) {
+                    Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid array", -1));
+                    return TCL_ERROR;
+                }
+                Tcl_Obj *elemNamePtr;
+                Tcl_ListObjIndex(interp, elemPtr, 0, &elemNamePtr);
                 Tcl_Obj *convertedElemPtr;
                 if (TCL_OK != tjson_CustomToTyped(interp, elemPtr, &convertedElemPtr)) {
                     return TCL_ERROR;
                 }
-                Tcl_ListObjAppendElement(interp, listPtr, convertedElemPtr);
+                Tcl_Obj *subDictPtr = Tcl_NewDictObj();
+                Tcl_DictObjPut(interp, subDictPtr, elemNamePtr, convertedElemPtr);
+                Tcl_Obj *subListPtr = Tcl_NewListObj(0, NULL);
+                Tcl_ListObjAppendElement(interp, subListPtr, Tcl_NewStringObj("M", -1));
+                Tcl_ListObjAppendElement(interp, subListPtr, subDictPtr);
+                Tcl_ListObjAppendElement(interp, listPtr, subListPtr);
             }
-            Tcl_ListObjAppendElement(interp, *resultPtr, listPtr);
+            Tcl_ListObjAppendElement(interp, arrListPtr, listPtr);
+            Tcl_Obj *arrDictPtr = Tcl_NewDictObj();
+            Tcl_DictObjPut(interp, arrDictPtr, namePtr, arrListPtr);
+            Tcl_ListObjAppendElement(interp, *resultPtr, arrDictPtr);
             break;
         default:
             Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid type in spec", -1));
