@@ -10,6 +10,9 @@ find_package(Threads REQUIRED)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_C_FLAGS  "-DVERSION=${PROJECT_VERSION} ${CMAKE_C_FLAGS}")
 
+enable_testing()
+add_test(NAME AllUnitTests COMMAND tclsh ${CMAKE_CURRENT_SOURCE_DIR}/tests/all.tcl)
+
 add_library(tjson MODULE src/library.c src/cJSON/cJSON.c src/jsonpath/jsonpath.c)
 set_target_properties(tjson PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
