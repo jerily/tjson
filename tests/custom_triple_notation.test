@@ -1,0 +1,37 @@
+package require tcltest
+package require tjson
+
+namespace import -force ::tcltest::test
+
+::tcltest::configure {*}$argv
+
+test custom_to_typed-1 {simple document with a mix of different types} {
+    set triple_notation [list mydoc document [list a int32 1 b int32 2 c string "hello\nworld" flag boolean true]]
+    set doc_example [::tjson::custom_to_typed $triple_notation]
+    ::tjson::typed_to_json $doc_example
+} {{"mydoc":{"a":1,"b":2,"c":"hello\nworld","flag":true}}}
+
+test custom_to_typed-2 {simple array with a mix of different types} {
+    set triple_notation [list myarr array [list 0 int32 1 1 int32 2 2 string "hello\nworld" 3 boolean true]]
+    set doc_example [::tjson::custom_to_typed $triple_notation]
+    ::tjson::typed_to_json $doc_example
+} {{"myarr":[1,2,"hello\nworld",true]}}
+
+test custom_to_typed-3 {mix of different types} {
+    set triple_notation [list name string Victor a array {0 string "x" 1 string "y"} age int 31]
+    set doc_example [::tjson::custom_to_typed $triple_notation]
+    ::tjson::typed_to_json $doc_example
+} {{"name":"Victor","a":["x","y"],"age":31}}
+
+test custom_to_typed-4 {document within array} {
+    set triple_notation [list name string Victor a array {0 string "x" 1 document {a1 int 1 a2 int 2 a3 string "hello"} 2 string "y"} age int 31]
+    set doc_example [::tjson::custom_to_typed $triple_notation]
+    ::tjson::typed_to_json $doc_example
+} {{"name":"Victor","a":["x",{"a1":1,"a2":2,"a3":"hello"},"y"],"age":31}}
+
+test custom_to_typed-5 {array within document} {
+    set triple_notation [list name string Franz info document {x int 203 y int 102 z array {0 string a 1 string b 2 string c}} age int 29 projects string gtat]
+    set doc_example [::tjson::custom_to_typed $triple_notation]
+    ::tjson::typed_to_json $doc_example
+} {{"name":"Franz","info":{"x":203,"y":102,"z":["a","b","c"]},"age":29,"projects":"gtat"}}
+
