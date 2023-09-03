@@ -1176,6 +1176,7 @@ static int tjson_CustomConvertTypeValue(Tcl_Interp *interp, Tcl_Obj *typePtr, Tc
                 Tcl_Obj *subListPtr = Tcl_NewListObj(0, NULL);
                 Tcl_ListObjAppendElement(interp, subListPtr, Tcl_NewStringObj("N", -1));
                 Tcl_ListObjAppendElement(interp, subListPtr, Tcl_NewDoubleObj(double_value));
+                *resultPtr = subListPtr;
             } else if (type_length == 8 && 0 == strcmp("document", type)) {
 
                 Tcl_Obj *convertedPtr;
