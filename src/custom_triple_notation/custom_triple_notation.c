@@ -2,6 +2,30 @@
 #include <string.h>
 #include "custom_triple_notation.h"
 
+// The triple notation is a flat list containing triples of the form
+//
+//    NAME TYPE VALUE
+//
+//where "TYPE" might have the following values:
+//
+//  "array",
+//  "binary",
+//  "boolean",
+//  "int32",
+//  "int64",
+//  "datetime",
+//  "decimal128",
+//  "document",
+//  "double",
+//  "minkey",
+//  "maxkey",
+//  "null",
+//  "oid",
+//  "regex",
+//  "string",
+//  "timestamp",
+//  "unknown"
+
 int tjson_CustomToTyped(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj **resultPtr);
 
 static int tjson_CustomConvertTypeValueToTyped(Tcl_Interp *interp, Tcl_Obj *typePtr, Tcl_Obj *valuePtr, Tcl_Obj **resultPtr) {
@@ -122,30 +146,6 @@ static int tjson_CustomConvertTypeValueToTyped(Tcl_Interp *interp, Tcl_Obj *type
 }
 
 int tjson_CustomToTyped(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj **resultPtr) {
-
-    // The triple notation is a flat list containing triples of the form
-    //
-    //    NAME TYPE VALUE
-    //
-    //where "TYPE" might have the following values:
-    //
-    //  "array",
-    //  "binary",
-    //  "boolean",
-    //  "int32",
-    //  "int64",
-    //  "datetime",
-    //  "decimal128",
-    //  "document",
-    //  "double",
-    //  "minkey",
-    //  "maxkey",
-    //  "null",
-    //  "oid",
-    //  "regex",
-    //  "string",
-    //  "timestamp",
-    //  "unknown"
 
     int objc;
     Tcl_Obj **objv;
