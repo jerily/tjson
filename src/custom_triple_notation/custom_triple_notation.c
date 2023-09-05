@@ -137,6 +137,39 @@ static int tjson_CustomConvertTypeValueToTyped(Tcl_Interp *interp, Tcl_Obj *type
                 return TCL_ERROR;
             }
             break;
+        case 't':
+            if (type_length == 9 && 0 == strcmp("timestamp", type)) {
+                // "valuePtr" is a pair of the form {t i} where "t" is the timestamp (long) and i is the increment (int)
+                int arrObjc;
+                Tcl_Obj **arrObjv;
+                if (TCL_OK != Tcl_ListObjGetElements(interp, valuePtr, &arrObjc, &arrObjv) || arrObjc != 2) {
+                    Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid timestamp", -1));
+                    return TCL_ERROR;
+                }
+                long timestamp;
+                int increment;
+                if (TCL_OK != Tcl_GetLongFromObj(interp, arrObjv[0], &timestamp)) {
+                    Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid timestamp", -1));
+                    return TCL_ERROR;
+                }
+                if (TCL_OK != Tcl_GetIntFromObj(interp, arrObjv[1], &increment)) {
+                    Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid increment", -1));
+                    return TCL_ERROR;
+                }
+                Tcl_Obj *subDictPtr = Tcl_NewDictObj();
+                Tcl_Obj *timestampObjv[2] = { Tcl_NewStringObj("N", -1), Tcl_NewLongObj(timestamp) };
+                Tcl_Obj *incrementObjv[2] = { Tcl_NewStringObj("N", -1), Tcl_NewIntObj(increment) };
+                Tcl_DictObjPut(interp, subDictPtr, Tcl_NewStringObj("t", -1), Tcl_NewListObj(2, timestampObjv));
+                Tcl_DictObjPut(interp, subDictPtr, Tcl_NewStringObj("i", -1), Tcl_NewListObj(2, incrementObjv));
+                Tcl_Obj *subListPtr = Tcl_NewListObj(0, NULL);
+                Tcl_ListObjAppendElement(interp, subListPtr, Tcl_NewStringObj("M", -1));
+                Tcl_ListObjAppendElement(interp, subListPtr, subDictPtr);
+                *resultPtr = subListPtr;
+            } else {
+                Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid type", -1));
+                return TCL_ERROR;
+            }
+            break;
         default:
             Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid type in spec", -1));
             return TCL_ERROR;  /* invalid type */
@@ -286,47 +319,116 @@ static int tjson_TypedConvertTypeValueToCustom(Tcl_Interp *interp, Tcl_Obj *spec
             break;
         case 'M':
             if (type_length == 1) {
-                // "valuePtr" is a dict
-                Tcl_DictSearch search;
-                Tcl_Obj *dictKeyPtr;
-                Tcl_Obj *dictValuePtr;
-                int done;
-                if (TCL_OK != Tcl_DictObjFirst(interp, valuePtr, &search, &dictKeyPtr, &dictValuePtr, &done)) {
-                    Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, first from dict", -1));
-                    return TCL_ERROR;
+                // check if the typed structure is a timestamp by:
+                // 1. "valuePtr" will be a dict of two keys, "t" for timestamp and "i" for increment
+                // 2. "t" will be a list of two elements, the first of which will be "N" and the second the timestamp
+                // 3. "i" will be a list of two elements, the first of which will be "N" and the second the increment
+
+                Tcl_Obj *tTypedPtr;
+                Tcl_Obj *iTypedPtr;
+                int dict_size;
+                if (TCL_OK == Tcl_DictObjSize(interp, valuePtr, &dict_size)
+                    && dict_size == 2
+                    && TCL_OK == Tcl_DictObjGet(interp, valuePtr, Tcl_NewStringObj("t", -1), &tTypedPtr)
+                    && TCL_OK == Tcl_DictObjGet(interp, valuePtr, Tcl_NewStringObj("i", -1), &iTypedPtr)) {
+
+                    // check if "tTypedPtr" is a list of two elements
+                    int tTyped_length;
+                    if (TCL_OK != Tcl_ListObjLength(interp, tTypedPtr, &tTyped_length) || tTyped_length != 2) {
+                        Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, tTyped length != 2", -1));
+                        return TCL_ERROR;
+                    }
+
+                    // check if "iTypedPtr" is a list of two elements
+                    int iTyped_length;
+                    if (TCL_OK != Tcl_ListObjLength(interp, iTypedPtr, &iTyped_length) || iTyped_length != 2) {
+                        Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, iTyped length != 2", -1));
+                        return TCL_ERROR;
+                    }
+
+                    // check the types that "tTypedPtr" and "iTypedPtr" are of the form {N <value>}
+                    Tcl_Obj *tTypedTypePtr;
+                    Tcl_Obj *iTypedTypePtr;
+                    if (TCL_OK != Tcl_ListObjIndex(interp, tTypedPtr, 0, &tTypedTypePtr)
+                        || TCL_OK != Tcl_ListObjIndex(interp, iTypedPtr, 0, &iTypedTypePtr)) {
+                        Tcl_SetObjResult(interp, Tcl_NewStringObj("error while extracting t and i types from typed", -1));
+                        return TCL_ERROR;
+                    }
+
+                    int tTypedType_length;
+                    const char *tTypedType = Tcl_GetStringFromObj(tTypedTypePtr, &tTypedType_length);
+                    int iTypedType_length;
+                    const char *iTypedType = Tcl_GetStringFromObj(iTypedTypePtr, &iTypedType_length);
+                    if (tTypedType_length != 1 || iTypedType_length != 1
+                        || tTypedType[0] != 'N' || iTypedType[0] != 'N') {
+                        Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, tTyped or iTyped not of the form {N <value>}", -1));
+                        return TCL_ERROR;
+                    }
+
+                    Tcl_Obj *tValuePtr;
+                    Tcl_Obj *iValuePtr;
+                    if (TCL_OK != Tcl_ListObjIndex(interp, tTypedPtr, 1, &tValuePtr)
+                        || TCL_OK != Tcl_ListObjIndex(interp, iTypedPtr, 1, &iValuePtr)) {
+                        Tcl_SetObjResult(interp, Tcl_NewStringObj("error while extracting t and i from typed", -1));
+                        return TCL_ERROR;
+                    }
+
+                    // add "tPtr" and "iPtr" to "subListPtr"
+                    Tcl_Obj *subListPtr = Tcl_NewListObj(0, NULL);
+                    Tcl_ListObjAppendElement(interp, subListPtr, tValuePtr);
+                    Tcl_ListObjAppendElement(interp, subListPtr, iValuePtr);
+
+                    // create the final output of type "timestamp" with "subListPtr" as value
+                    Tcl_Obj *listPtr = Tcl_NewListObj(0, NULL);
+                    Tcl_ListObjAppendElement(interp, listPtr, Tcl_NewStringObj("timestamp", -1));
+                    Tcl_ListObjAppendElement(interp, listPtr, subListPtr);
+                    *resultPtr = listPtr;
+
+                } else {
+                    // "valuePtr" is a dict
+                    Tcl_DictSearch search;
+                    Tcl_Obj *dictKeyPtr;
+                    Tcl_Obj *dictValuePtr;
+                    int done;
+                    if (TCL_OK != Tcl_DictObjFirst(interp, valuePtr, &search, &dictKeyPtr, &dictValuePtr, &done)) {
+                        Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, first from dict", -1));
+                        return TCL_ERROR;
+                    }
+                    Tcl_Obj *subListPtr = Tcl_NewListObj(0, NULL);
+                    for (; !done; Tcl_DictObjNext(&search, &dictKeyPtr, &dictValuePtr, &done)) {
+                        Tcl_Obj *convertedPtr;
+                        if (TCL_OK != tjson_TypedConvertTypeValueToCustom(interp, dictValuePtr, &convertedPtr)) {
+                            return TCL_ERROR;
+                        }
+
+                        // extract "convertedTypePtr" and "convertedValuePtr" from "convertedPtr"
+                        int converted_length;
+                        if (TCL_OK != Tcl_ListObjLength(interp, convertedPtr, &converted_length) ||
+                            converted_length != 2) {
+                            Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, converted length != 2", -1));
+                            return TCL_ERROR;
+                        }
+
+                        Tcl_Obj *convertedTypePtr;
+                        Tcl_Obj *convertedValuePtr;
+                        if (TCL_OK != Tcl_ListObjIndex(interp, convertedPtr, 0, &convertedTypePtr)
+                            || TCL_OK != Tcl_ListObjIndex(interp, convertedPtr, 1, &convertedValuePtr)) {
+                            Tcl_SetObjResult(interp,
+                                             Tcl_NewStringObj("error while extracting type and value from converted",
+                                                              -1));
+                            return TCL_ERROR;
+                        }
+
+                        Tcl_ListObjAppendElement(interp, subListPtr, dictKeyPtr);
+                        Tcl_ListObjAppendElement(interp, subListPtr, convertedTypePtr);
+                        Tcl_ListObjAppendElement(interp, subListPtr, convertedValuePtr);
+                    }
+
+                    Tcl_Obj *listPtr = Tcl_NewListObj(0, NULL);
+                    Tcl_ListObjAppendElement(interp, listPtr, Tcl_NewStringObj("document", -1));
+                    Tcl_ListObjAppendElement(interp, listPtr, subListPtr);
+                    *resultPtr = listPtr;
                 }
-                Tcl_Obj *subListPtr = Tcl_NewListObj(0, NULL);
-                for (; !done; Tcl_DictObjNext(&search, &dictKeyPtr, &dictValuePtr, &done)) {
-                    Tcl_Obj *convertedPtr;
-                    if (TCL_OK != tjson_TypedConvertTypeValueToCustom(interp, dictValuePtr, &convertedPtr)) {
-                        return TCL_ERROR;
-                    }
-
-                    // extract "convertedTypePtr" and "convertedValuePtr" from "convertedPtr"
-                    int converted_length;
-                    if (TCL_OK != Tcl_ListObjLength(interp, convertedPtr, &converted_length) || converted_length != 2) {
-                        Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, converted length != 2", -1));
-                        return TCL_ERROR;
-                    }
-
-                    Tcl_Obj *convertedTypePtr;
-                    Tcl_Obj *convertedValuePtr;
-                    if (TCL_OK != Tcl_ListObjIndex(interp, convertedPtr, 0, &convertedTypePtr)
-                        || TCL_OK != Tcl_ListObjIndex(interp, convertedPtr, 1, &convertedValuePtr)) {
-                        Tcl_SetObjResult(interp, Tcl_NewStringObj("error while extracting type and value from converted", -1));
-                        return TCL_ERROR;
-                    }
-
-                    Tcl_ListObjAppendElement(interp, subListPtr, dictKeyPtr);
-                    Tcl_ListObjAppendElement(interp, subListPtr, convertedTypePtr);
-                    Tcl_ListObjAppendElement(interp, subListPtr, convertedValuePtr);
-                }
-
-                Tcl_Obj *listPtr = Tcl_NewListObj(0, NULL);
-                Tcl_ListObjAppendElement(interp, listPtr, Tcl_NewStringObj("document", -1));
-                Tcl_ListObjAppendElement(interp, listPtr, subListPtr);
-
-                *resultPtr = listPtr;
             } else {
                 Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid type", -1));
                 return TCL_ERROR;

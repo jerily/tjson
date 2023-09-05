@@ -64,3 +64,15 @@ test typed_to_custom-5 {array within document} {
     set typed_spec [::tjson::json_to_typed $json]
     ::tjson::typed_to_custom $typed_spec
 } [list name string Franz info document [list x int32 203 y int32 102 z array {0 string a 1 string b 2 string c}] age int32 29 projects string gtat]
+
+test custom_to_typed-6 {timestamp to typed} {
+    set triple_notation [list ts timestamp {1302945037 1}]
+    set typed_spec [::tjson::custom_to_typed $triple_notation]
+    ::tjson::typed_to_json $typed_spec
+} {{"ts":{"t":1302945037,"i":1}}}
+
+test typed_to_custom-6 {typed to timestamp} {
+    set json {{"ts":{"t":1302945037,"i":1}}}
+    set typed_spec [::tjson::json_to_typed $json]
+    ::tjson::typed_to_custom $typed_spec
+} [list ts timestamp {1302945037 1}]
