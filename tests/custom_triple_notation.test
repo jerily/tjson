@@ -9,58 +9,88 @@ test custom_to_typed-1 {simple document with a mix of different types} {
     set triple_notation [list mydoc document [list a int32 1 b int32 2 c string "hello\nworld" flag boolean true]]
     set typed_spec [::tjson::custom_to_typed $triple_notation]
     ::tjson::typed_to_json $typed_spec
-} {{"mydoc":{"a":1,"b":2,"c":"hello\nworld","flag":true}}}
+} {{"mydoc":{"a":{"$numberInt":1},"b":{"$numberInt":2},"c":"hello\nworld","flag":true}}}
 
 test custom_to_typed-2 {simple array with a mix of different types} {
     set triple_notation [list myarr array [list 0 int32 1 1 int32 2 2 string "hello\nworld" 3 boolean true]]
     set typed_spec [::tjson::custom_to_typed $triple_notation]
     ::tjson::typed_to_json $typed_spec
-} {{"myarr":[1,2,"hello\nworld",true]}}
+} {{"myarr":[{"$numberInt":1},{"$numberInt":2},"hello\nworld",true]}}
 
 test custom_to_typed-3 {mix of different types} {
     set triple_notation [list name string Victor a array {0 string "x" 1 string "y"} age int 31]
     set typed_spec [::tjson::custom_to_typed $triple_notation]
     ::tjson::typed_to_json $typed_spec
-} {{"name":"Victor","a":["x","y"],"age":31}}
+} {{"name":"Victor","a":["x","y"],"age":{"$numberInt":31}}}
 
 test custom_to_typed-4 {document within array} {
     set triple_notation [list name string Victor a array {0 string "x" 1 document {a1 int 1 a2 int 2 a3 string "hello"} 2 string "y"} age int 31]
     set typed_spec [::tjson::custom_to_typed $triple_notation]
     ::tjson::typed_to_json $typed_spec
-} {{"name":"Victor","a":["x",{"a1":1,"a2":2,"a3":"hello"},"y"],"age":31}}
+} {{"name":"Victor","a":["x",{"a1":{"$numberInt":1},"a2":{"$numberInt":2},"a3":"hello"},"y"],"age":{"$numberInt":31}}}
 
 test custom_to_typed-5 {array within document} {
     set triple_notation [list name string Franz info document {x int 203 y int 102 z array {0 string a 1 string b 2 string c}} age int 29 projects string gtat]
     set typed_spec [::tjson::custom_to_typed $triple_notation]
     ::tjson::typed_to_json $typed_spec
-} {{"name":"Franz","info":{"x":203,"y":102,"z":["a","b","c"]},"age":29,"projects":"gtat"}}
+} {{"name":"Franz","info":{"x":{"$numberInt":203},"y":{"$numberInt":102},"z":["a","b","c"]},"age":{"$numberInt":29},"projects":"gtat"}}
 
-test typed_to_custom-1 {simple document with a mix of different types} {
+test typed_to_custom-1a {simple document with a mix of different types} {
     set json {{"mydoc":{"a":1,"b":2,"c":"hello\nworld","flag":true}}}
     set typed_spec [::tjson::json_to_typed $json]
     ::tjson::typed_to_custom $typed_spec
 } [list mydoc document [list a int32 1 b int32 2 c string "hello\nworld" flag boolean 1]]
 
-test typed_to_custom-2 {simple array with a mix of different types} {
+test typed_to_custom-1b {simple document with a mix of different types} {
+    set json {{"mydoc":{"a":{"$numberInt":1},"b":{"$numberInt":2},"c":"hello\nworld","flag":true}}}
+    set typed_spec [::tjson::json_to_typed $json]
+    ::tjson::typed_to_custom $typed_spec
+} [list mydoc document [list a int32 1 b int32 2 c string "hello\nworld" flag boolean 1]]
+
+test typed_to_custom-2a {simple array with a mix of different types} {
     set json {{"myarr":[1,2,"hello\nworld",true]}}
     set typed_spec [::tjson::json_to_typed $json]
     ::tjson::typed_to_custom $typed_spec
 } [list myarr array [list 0 int32 1 1 int32 2 2 string "hello\nworld" 3 boolean 1]]
 
-test typed_to_custom-3 {mix of different types} {
+test typed_to_custom-2b {simple array with a mix of different types} {
+    set json {{"myarr":[{"$numberInt":1},{"$numberInt":2},"hello\nworld",true]}}
+    set typed_spec [::tjson::json_to_typed $json]
+    ::tjson::typed_to_custom $typed_spec
+} [list myarr array [list 0 int32 1 1 int32 2 2 string "hello\nworld" 3 boolean 1]]
+
+test typed_to_custom-3a {mix of different types} {
     set json {{"name":"Victor","a":["x","y"],"age":31}}
     set typed_spec [::tjson::json_to_typed $json]
     ::tjson::typed_to_custom $typed_spec
 } [list name string Victor a array {0 string x 1 string y} age int32 31]
 
-test typed_to_custom-4 {document within array} {
+test typed_to_custom-3b {mix of different types} {
+    set json {{"name":"Victor","a":["x","y"],"age":{"$numberInt":31}}}
+    set typed_spec [::tjson::json_to_typed $json]
+    ::tjson::typed_to_custom $typed_spec
+} [list name string Victor a array {0 string x 1 string y} age int32 31]
+
+test typed_to_custom-4a {document within array} {
     set json {{"name":"Victor","a":["x",{"a1":1,"a2":2,"a3":"hello"},"y"],"age":31}}
     set typed_spec [::tjson::json_to_typed $json]
     ::tjson::typed_to_custom $typed_spec
 } [list name string Victor a array [list 0 string x 1 document [list a1 int32 1 a2 int32 2 a3 string hello] 2 string y] age int32 31]
 
-test typed_to_custom-5 {array within document} {
+test typed_to_custom-4b {document within array} {
+    set json {{"name":"Victor","a":["x",{"a1":{"$numberInt":1},"a2":{"$numberInt":2},"a3":"hello"},"y"],"age":{"$numberInt":31}}}
+    set typed_spec [::tjson::json_to_typed $json]
+    ::tjson::typed_to_custom $typed_spec
+} [list name string Victor a array [list 0 string x 1 document [list a1 int32 1 a2 int32 2 a3 string hello] 2 string y] age int32 31]
+
+test typed_to_custom-5a {array within document} {
     set json {{"name":"Franz","info":{"x":203,"y":102,"z":["a","b","c"]},"age":29,"projects":"gtat"}}
+    set typed_spec [::tjson::json_to_typed $json]
+    ::tjson::typed_to_custom $typed_spec
+} [list name string Franz info document [list x int32 203 y int32 102 z array {0 string a 1 string b 2 string c}] age int32 29 projects string gtat]
+
+test typed_to_custom-5b {array within document} {
+    set json {{"name":"Franz","info":{"x":{"$numberInt":203},"y":{"$numberInt":102},"z":["a","b","c"]},"age":{"$numberInt":29},"projects":"gtat"}}
     set typed_spec [::tjson::json_to_typed $json]
     ::tjson::typed_to_custom $typed_spec
 } [list name string Franz info document [list x int32 203 y int32 102 z array {0 string a 1 string b 2 string c}] age int32 29 projects string gtat]
@@ -72,7 +102,31 @@ test custom_to_typed-6 {timestamp to typed} {
 } {{"ts":{"t":1302945037,"i":1}}}
 
 test typed_to_custom-6 {typed to timestamp} {
-    set json {{"ts":{"t":1302945037,"i":1}}}
+    set json {{"ts":{"$timestamp": {"t":1302945037,"i":1}}}}
     set typed_spec [::tjson::json_to_typed $json]
     ::tjson::typed_to_custom $typed_spec
 } [list ts timestamp {1302945037 1}]
+
+test custom_to_typed-7 {date to typed} {
+    set triple_notation [list dt date 1302945037]
+    set typed_spec [::tjson::custom_to_typed $triple_notation]
+    ::tjson::typed_to_json $typed_spec
+} {{"dt":{"$date":{"$numberLong":1302945037}}}}
+
+test typed_to_custom-7 {typed to timestamp} {
+    set json {{"dt":{"$date":{"$numberLong": 1302945037}}}}
+    set typed_spec [::tjson::json_to_typed $json]
+    ::tjson::typed_to_custom $typed_spec
+} [list dt date {1302945037}]
+
+test custom_to_typed-8 {regex to typed} {
+    set triple_notation [list r regex {"foo" "ix"}]
+    set typed_spec [::tjson::custom_to_typed $triple_notation]
+    ::tjson::typed_to_json $typed_spec
+} {{"r":{"$regularExpression":{"pattern":"foo","options":"ix"}}}}
+
+test typed_to_custom-8 {typed to regex} {
+    set json {{"r":{"$regularExpression":{"pattern":"foo","options":"ix"}}}}
+    set typed_spec [::tjson::json_to_typed $json]
+    ::tjson::typed_to_custom $typed_spec
+} [list r regex {foo ix}]
