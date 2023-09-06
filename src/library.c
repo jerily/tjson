@@ -280,7 +280,10 @@ static int tjson_ParseCmd(ClientData  clientData, Tcl_Interp *interp, int objc, 
 
     int length;
     const char *json = Tcl_GetStringFromObj(objv[1], &length);
-
+    if (length == 0) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("empty json", -1));
+        return TCL_ERROR;
+    }
     cJSON *root_structure = cJSON_ParseWithLength(json, length);
 
     char handle[80];
