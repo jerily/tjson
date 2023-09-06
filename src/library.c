@@ -265,11 +265,12 @@ static int tjson_JsonToSimpleCmd(ClientData  clientData, Tcl_Interp *interp, int
     int length;
     const char *json = Tcl_GetStringFromObj(objv[1], &length);
 
-    cJSON *root_structure = cJSON_ParseWithLength(json, length);
-    Tcl_Obj *resultPtr = tjson_TreeToSimple(interp, root_structure);
-    cJSON_Delete(root_structure);
-
-    Tcl_SetObjResult(interp, resultPtr);
+    if (length > 0) {
+        cJSON *root_structure = cJSON_ParseWithLength(json, length);
+        Tcl_Obj *resultPtr = tjson_TreeToSimple(interp, root_structure);
+        cJSON_Delete(root_structure);
+        Tcl_SetObjResult(interp, resultPtr);
+    }
     return TCL_OK;
 }
 
