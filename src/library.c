@@ -1147,6 +1147,9 @@ static int tjson_TypedToCustomCmd(ClientData  clientData, Tcl_Interp *interp, in
 }
 
 static void tjson_ExitHandler(ClientData unused) {
+    Tcl_MutexLock(&tjson_NodeToInternal_HT_Mutex);
+    Tcl_DeleteHashTable(&tjson_NodeToInternal_HT);
+    Tcl_MutexUnlock(&tjson_NodeToInternal_HT_Mutex);
 }
 
 
@@ -1158,7 +1161,9 @@ void tjson_InitModule() {
         hooks->unregister_fn = tjson_Unregister;
         cJSON_InitHooks(hooks);
         free(hooks);
+        Tcl_MutexLock(&tjson_NodeToInternal_HT_Mutex);
         Tcl_InitHashTable(&tjson_NodeToInternal_HT, TCL_STRING_KEYS);
+        Tcl_MutexUnlock(&tjson_NodeToInternal_HT_Mutex);
         Tcl_CreateThreadExitHandler(tjson_ExitHandler, NULL);
         tjson_ModuleInitialized = 1;
         DBG(fprintf(stderr, "tjson module initialized\n"));
