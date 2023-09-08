@@ -42,7 +42,7 @@ cd build
 cmake ..
 make
 make install
-tclsh ../example.tcl
+tclsh ../examples/example1.tcl
 ```
 
 For NaviServer using Makefile:
