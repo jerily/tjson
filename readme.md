@@ -29,18 +29,13 @@ TCL/C extension for parsing, manipulating, and querying JSON.
 => hello\"world\n
 ```
 
-## Clone the repository
-```bash
-git clone https://github.com/jerily/tjson.git
-cd tjson
-TJSON_DIR=$(pwd)
-```
-
 ## Build the library
 For TCL:
 ```bash
 # Build the TCL extension
-cd ${TJSON_DIR}
+wget https://github.com/jerily/tjson/archive/refs/tags/v1.0.3.tar.gz
+tar -xzf v1.0.3.tar.gz
+export TJSON_DIR=$(pwd)/snappy-tcl-1.0.3
 mkdir build
 cd build
 cmake ..
@@ -98,6 +93,11 @@ make install
   - returns a prettified JSON string for the given node
 * **::tjson::query** *handle* *jsonpath*
   - returns a list of handles for the given JSON path expression
+* **::tjson::custom_to_typed** *custom_spec*
+  - returns a typed TCL structure for the given custom (triple notation / bson) spec
+* **::tjson::typed_to_custom** *typed_spec*
+  - returns a custom (triple notation / bson) spec from a typed TCL structure (like the one returned by ::tjson::custom_to_typed)
+
 
 ## Typed TCL Notation/Spec
 
