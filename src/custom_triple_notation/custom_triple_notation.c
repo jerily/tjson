@@ -183,32 +183,46 @@ static int tjson_CustomConvertTypeValueToTyped(Tcl_Interp *interp, Tcl_Obj *type
             break;
         case 't':
             if (type_length == 9 && 0 == strcmp("timestamp", type)) {
-                // "valuePtr" is a pair of the form {t i} where "t" is the timestamp (long) and i is the increment (int)
-                int arrObjc;
-                Tcl_Obj **arrObjv;
-                if (TCL_OK != Tcl_ListObjGetElements(interp, valuePtr, &arrObjc, &arrObjv) || arrObjc != 2) {
+                // check that "valuePtr" is a list of two elements
+                int value_length;
+                if (TCL_OK != Tcl_ListObjLength(interp, valuePtr, &value_length) || value_length != 2) {
                     Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid timestamp", -1));
                     return TCL_ERROR;
                 }
-                long timestamp;
-                int increment;
-                if (TCL_OK != Tcl_GetLongFromObj(interp, arrObjv[0], &timestamp)) {
-                    Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid timestamp", -1));
+
+                // the first element is "timestamp" and the second is "increment"
+                Tcl_Obj *timestampPtr;
+                Tcl_Obj *incrementPtr;
+                if (TCL_OK != Tcl_ListObjIndex(interp, valuePtr, 0, &timestampPtr)
+                    || TCL_OK != Tcl_ListObjIndex(interp, valuePtr, 1, &incrementPtr)) {
+                    Tcl_SetObjResult(interp, Tcl_NewStringObj("error while extracting pattern and options from timestamp", -1));
                     return TCL_ERROR;
                 }
-                if (TCL_OK != Tcl_GetIntFromObj(interp, arrObjv[1], &increment)) {
-                    Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid increment", -1));
-                    return TCL_ERROR;
-                }
+
+                Tcl_Obj *patternSubSubListPtr = Tcl_NewListObj(0, NULL);
+                Tcl_ListObjAppendElement(interp, patternSubSubListPtr, Tcl_NewStringObj("S", -1));
+                Tcl_ListObjAppendElement(interp, patternSubSubListPtr, Tcl_DuplicateObj(timestampPtr));
+
+                Tcl_Obj *optionsSubSubListPtr = Tcl_NewListObj(0, NULL);
+                Tcl_ListObjAppendElement(interp, optionsSubSubListPtr, Tcl_NewStringObj("S", -1));
+                Tcl_ListObjAppendElement(interp, optionsSubSubListPtr, Tcl_DuplicateObj(incrementPtr));
+
                 Tcl_Obj *subDictPtr = Tcl_NewDictObj();
-                Tcl_Obj *timestampObjv[2] = { Tcl_NewStringObj("N", -1), Tcl_NewLongObj(timestamp) };
-                Tcl_Obj *incrementObjv[2] = { Tcl_NewStringObj("N", -1), Tcl_NewIntObj(increment) };
-                Tcl_DictObjPut(interp, subDictPtr, Tcl_NewStringObj("t", -1), Tcl_NewListObj(2, timestampObjv));
-                Tcl_DictObjPut(interp, subDictPtr, Tcl_NewStringObj("i", -1), Tcl_NewListObj(2, incrementObjv));
+                Tcl_DictObjPut(interp, subDictPtr, Tcl_NewStringObj("t", -1), patternSubSubListPtr);
+                Tcl_DictObjPut(interp, subDictPtr, Tcl_NewStringObj("i", -1), optionsSubSubListPtr);
+
                 Tcl_Obj *subListPtr = Tcl_NewListObj(0, NULL);
                 Tcl_ListObjAppendElement(interp, subListPtr, Tcl_NewStringObj("M", -1));
                 Tcl_ListObjAppendElement(interp, subListPtr, subDictPtr);
-                *resultPtr = subListPtr;
+
+                Tcl_Obj *dictPtr = Tcl_NewDictObj();
+                Tcl_DictObjPut(interp, dictPtr, Tcl_NewStringObj("$timestamp", -1), subListPtr);
+
+                // "resultPtr" is a list of the form {M <dict>}
+                Tcl_Obj *listPtr = Tcl_NewListObj(0, NULL);
+                Tcl_ListObjAppendElement(interp, listPtr, Tcl_NewStringObj("M", -1));
+                Tcl_ListObjAppendElement(interp, listPtr, dictPtr);
+                *resultPtr = listPtr;
             } else {
                 Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid type", -1));
                 return TCL_ERROR;
@@ -256,6 +270,30 @@ static int tjson_CustomConvertTypeValueToTyped(Tcl_Interp *interp, Tcl_Obj *type
                 Tcl_ListObjAppendElement(interp, listPtr, Tcl_NewStringObj("M", -1));
                 Tcl_ListObjAppendElement(interp, listPtr, dictPtr);
                 *resultPtr = listPtr;
+            } else {
+                Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid type", -1));
+                return TCL_ERROR;
+            }
+            break;
+        case 'o':
+            if (type_length == 3 && 0 == strcmp("oid", type)) {
+                // check that "valuePtr" is the oid
+
+                Tcl_Obj *subListPtr = Tcl_NewListObj(0, NULL);
+                Tcl_ListObjAppendElement(interp, subListPtr, Tcl_NewStringObj("S", -1));
+                Tcl_ListObjAppendElement(interp, subListPtr, Tcl_DuplicateObj(valuePtr));
+
+                Tcl_Obj *dictPtr = Tcl_NewDictObj();
+                Tcl_DictObjPut(interp, dictPtr, Tcl_NewStringObj("$oid", -1), subListPtr);
+
+                // "resultPtr" is a list of the form {M <dict>}
+                Tcl_Obj *listPtr = Tcl_NewListObj(0, NULL);
+                Tcl_ListObjAppendElement(interp, listPtr, Tcl_NewStringObj("M", -1));
+                Tcl_ListObjAppendElement(interp, listPtr, dictPtr);
+                *resultPtr = listPtr;
+            } else {
+                Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid type", -1));
+                return TCL_ERROR;
             }
             break;
         default:
@@ -612,6 +650,48 @@ static int tjson_TypedConvertMaxKeyToCustom(Tcl_Interp *interp, Tcl_Obj *specPtr
     return tjson_TypedConvertNumberLongToCustom(interp, specPtr, resultPtr);
 }
 
+static int tjson_TypedConvertOidToCustom(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj **resultPtr) {
+    // "specPtr" must be a dict of the form {M <dict>}
+    // "dict" must have a key "$oid" with a value of the form {S <value>}
+    // "value" must be a string
+
+
+    // check if "specPtr" is a list of two elements
+    int spec_length;
+    if (TCL_OK != Tcl_ListObjLength(interp, specPtr, &spec_length) || spec_length != 2) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, spec length != 2", -1));
+        return TCL_ERROR;
+    }
+
+    // check if "specPtr" is of the form {M <dict>}
+    Tcl_Obj *typePtr;
+    Tcl_Obj *valuePtr;
+    if (TCL_OK != Tcl_ListObjIndex(interp, specPtr, 0, &typePtr)
+        || TCL_OK != Tcl_ListObjIndex(interp, specPtr, 1, &valuePtr)) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("error while extracting type and value from typed", -1));
+        return TCL_ERROR;
+    }
+
+    int type_length;
+    const char *type = Tcl_GetStringFromObj(typePtr, &type_length);
+    if (type_length != 1 || type[0] != 'S') {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, type != M inside $oid", -1));
+        return TCL_ERROR;
+    }
+
+    // try to read string from "oidValueValuePtr"
+    int value_length;
+    const char *value = Tcl_GetStringFromObj(valuePtr, &value_length);
+
+    // "resultPtr" is a list of the form {N <value>}
+    Tcl_Obj *listPtr = Tcl_NewListObj(0, NULL);
+    Tcl_ListObjAppendElement(interp, listPtr, Tcl_NewStringObj("oid", -1));
+    Tcl_ListObjAppendElement(interp, listPtr, Tcl_NewStringObj(value, value_length));
+    *resultPtr = listPtr;
+    return TCL_OK;
+
+}
+
 static int tjson_TypedConvertDateToCustom(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj **resultPtr) {
     // "specPtr" must be a dict of the form {M <dict>}
     // "dict" must have a key "$numberLong" with a value of the form {N <value>}
@@ -869,6 +949,11 @@ static int tjson_TypedConvertTypeValueToCustom(Tcl_Interp *interp, Tcl_Obj *spec
                         break;
                     } else if (dict_key_length == 7 && 0 == strncmp("$maxKey", dict_key, dict_key_length)) {
                         if (TCL_OK != tjson_TypedConvertMaxKeyToCustom(interp, dictValuePtr, resultPtr)) {
+                            return TCL_ERROR;
+                        }
+                        break;
+                    } else if (dict_key_length == 4 && 0 == strncmp("$oid", dict_key, dict_key_length)) {
+                        if (TCL_OK != tjson_TypedConvertOidToCustom(interp, dictValuePtr, resultPtr)) {
                             return TCL_ERROR;
                         }
                         break;

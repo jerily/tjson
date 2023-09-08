@@ -99,7 +99,7 @@ test custom_to_typed-6 {timestamp to typed} {
     set triple_notation [list ts timestamp {1302945037 1}]
     set typed_spec [::tjson::custom_to_typed $triple_notation]
     ::tjson::typed_to_json $typed_spec
-} {{"ts":{"t":1302945037,"i":1}}}
+} {{"ts":{"$timestamp":{"t":"1302945037","i":"1"}}}}
 
 test typed_to_custom-6 {typed to timestamp} {
     set json {{"ts":{"$timestamp": {"t":1302945037,"i":1}}}}
@@ -130,3 +130,15 @@ test typed_to_custom-8 {typed to regex} {
     set typed_spec [::tjson::json_to_typed $json]
     ::tjson::typed_to_custom $typed_spec
 } [list r regex {foo ix}]
+
+test custom_to_typed-9 {oid to typed} {
+    set triple_notation [list _id oid 64f9ce9eb84de6be1f06e967]
+    set typed_spec [::tjson::custom_to_typed $triple_notation]
+    ::tjson::typed_to_json $typed_spec
+} {{"_id":{"$oid":"64f9ce9eb84de6be1f06e967"}}}
+
+test typed_to_custom-9 {typed to oid} {
+    set json {{"_id":{"$oid":"64f9ce9eb84de6be1f06e967"}}}
+    set typed_spec [::tjson::json_to_typed $json]
+    ::tjson::typed_to_custom $typed_spec
+} [list _id oid 64f9ce9eb84de6be1f06e967]
