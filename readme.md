@@ -36,6 +36,7 @@ For TCL:
 wget https://github.com/jerily/tjson/archive/refs/tags/v1.0.3.tar.gz
 tar -xzf v1.0.3.tar.gz
 export TJSON_DIR=$(pwd)/tjson-1.0.3
+cd ${TJSON_DIR}
 mkdir build
 cd build
 cmake ..
