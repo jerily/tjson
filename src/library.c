@@ -290,6 +290,10 @@ static int tjson_ParseCmd(ClientData  clientData, Tcl_Interp *interp, int objc, 
         return TCL_ERROR;
     }
     cJSON *root_structure = cJSON_ParseWithLength(json, length);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid json", -1));
+        return TCL_ERROR;
+    }
 
     char handle[80];
     CMD_NAME(handle, root_structure);
