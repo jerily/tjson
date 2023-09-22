@@ -267,9 +267,14 @@ static int tjson_JsonToSimpleCmd(ClientData  clientData, Tcl_Interp *interp, int
 
     if (length > 0) {
         cJSON *root_structure = cJSON_ParseWithLength(json, length);
-        Tcl_Obj *resultPtr = tjson_TreeToSimple(interp, root_structure);
-        cJSON_Delete(root_structure);
-        Tcl_SetObjResult(interp, resultPtr);
+        if (root_structure) {
+            Tcl_Obj *resultPtr = tjson_TreeToSimple(interp, root_structure);
+            cJSON_Delete(root_structure);
+            Tcl_SetObjResult(interp, resultPtr);
+        } else {
+            Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid json", -1));
+            return TCL_ERROR;
+        }
     }
     return TCL_OK;
 }
