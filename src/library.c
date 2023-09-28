@@ -747,7 +747,7 @@ static int tjson_EscapeJsonString(Tcl_Obj *objPtr, Tcl_DString *dsPtr) {
     const char *str = Tcl_GetStringFromObj(objPtr, &length);
     // loop through each character of the input string
     for (int i = 0; i < length; i++) {
-        char c = str[i];
+        unsigned char c = str[i];
         switch (c) {
             case '"':
                 Tcl_DStringAppend(dsPtr, "\\\"", 2);
@@ -807,13 +807,19 @@ static int tjson_TreeToJson(Tcl_Interp *interp, cJSON *item, int num_spaces, Tcl
                 return TCL_OK;
             } else if(d == (double)item->valueint) {
                 int intstr_length;
-                const char *intstr = Tcl_GetStringFromObj(Tcl_NewIntObj(item->valueint), &intstr_length);
+                Tcl_Obj *intObjPtr = Tcl_NewIntObj(item->valueint);
+                Tcl_IncrRefCount(intObjPtr);
+                const char *intstr = Tcl_GetStringFromObj(intObjPtr, &intstr_length);
                 Tcl_DStringAppend(dsPtr, intstr, intstr_length);
+                Tcl_DecrRefCount(intObjPtr);
                 return TCL_OK;
             } else {
                 int doublestr_length;
-                const char *doublestr = Tcl_GetStringFromObj(Tcl_NewDoubleObj(item->valuedouble), &doublestr_length);
+                Tcl_Obj *doubleObjPtr = Tcl_NewDoubleObj(item->valuedouble);
+                Tcl_IncrRefCount(doubleObjPtr);
+                const char *doublestr = Tcl_GetStringFromObj(doubleObjPtr, &doublestr_length);
                 Tcl_DStringAppend(dsPtr, doublestr, doublestr_length);
+                Tcl_DecrRefCount(doubleObjPtr);
                 return TCL_OK;
             }
         case cJSON_Raw:
@@ -824,15 +830,21 @@ static int tjson_TreeToJson(Tcl_Interp *interp, cJSON *item, int num_spaces, Tcl
                 return TCL_OK;
             }
             Tcl_DStringAppend(dsPtr, "\"", 1);
-            tjson_EscapeJsonString(Tcl_NewStringObj(item->valuestring, -1), dsPtr);
+            Tcl_Obj *strObjPtr = Tcl_NewStringObj(item->valuestring, -1);
+            Tcl_IncrRefCount(strObjPtr);
+            tjson_EscapeJsonString(strObjPtr, dsPtr);
             Tcl_DStringAppend(dsPtr, "\"", 1);
+            Tcl_DecrRefCount(strObjPtr);
             return TCL_OK;
         }
 
         case cJSON_String:
             Tcl_DStringAppend(dsPtr, "\"", 1);
-            tjson_EscapeJsonString(Tcl_NewStringObj(item->valuestring, -1), dsPtr);
+            Tcl_Obj *strObjPtr = Tcl_NewStringObj(item->valuestring, -1);
+            Tcl_IncrRefCount(strObjPtr);
+            tjson_EscapeJsonString(strObjPtr, dsPtr);
             Tcl_DStringAppend(dsPtr, "\"", 1);
+            Tcl_DecrRefCount(strObjPtr);
             return TCL_OK;
         case cJSON_Array:
             Tcl_DStringAppend(dsPtr, LBRACKET, 1);
@@ -890,7 +902,10 @@ static int tjson_TreeToJson(Tcl_Interp *interp, cJSON *item, int num_spaces, Tcl
                     }
                 }
                 Tcl_DStringAppend(dsPtr, "\"", 1);
-                tjson_EscapeJsonString(Tcl_NewStringObj(current_item->string, -1), dsPtr);
+                Tcl_Obj *strToEscapeObjPtr = Tcl_NewStringObj(current_item->string, -1);
+                Tcl_IncrRefCount(strToEscapeObjPtr);
+                tjson_EscapeJsonString(strToEscapeObjPtr, dsPtr);
+                Tcl_DecrRefCount(strToEscapeObjPtr);
                 Tcl_DStringAppend(dsPtr, "\":", 2);
                 if (num_spaces) {
                     Tcl_DStringAppend(dsPtr, SP, 1);
