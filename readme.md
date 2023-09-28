@@ -65,8 +65,8 @@ make install
     - returns a JSON string from a typed TCL structure (like the one returned by ::tjson::json_to_typed)
 * **::tjson::parse** *json_string*
     - returns a handle to manipulate the JSON string
-* **::tjson::delete** *handle*
-    - deletes the JSON node structure for the given handle
+* **::tjson::destroy** *handle*
+    - destroys the JSON node structure for the given handle
 * **::tjson::size** *handle*
   - returns the size of the JSON node structure for the given handle
 * **::tjson::add_item_to_object** *handle* *key* *typed_spec*
