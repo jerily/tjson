@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22.1)
-project(tjson VERSION 1.0.6 LANGUAGES C)
+project(tjson VERSION 1.0.7 LANGUAGES C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 set(TARGET tjson)
