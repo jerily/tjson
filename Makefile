@@ -10,7 +10,7 @@ MOD      =  tjson.so
 #
 # Objects to build.
 #
-MODOBJS     = src/library.o src/cJSON/cJSON.o
+MODOBJS     = src/library.o src/cJSON/cJSON.o src/jsonpath/jsonpath.o src/custom_triple_notation/custom_triple_notation.o
 
 #MODLIBS  +=
 
