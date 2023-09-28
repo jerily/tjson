@@ -29,17 +29,20 @@ TCL/C extension for parsing, manipulating, and querying JSON.
 => hello\"world\n
 ```
 
-## Build the library
+## Build the tjson extension
 For TCL:
 ```bash
 # Build the TCL extension
-wget https://github.com/jerily/tjson/archive/refs/tags/v1.0.5.tar.gz
-tar -xzf v1.0.5.tar.gz
-export TJSON_DIR=$(pwd)/tjson-1.0.5
+wget https://github.com/jerily/tjson/archive/refs/tags/v1.0.6.tar.gz
+tar -xzf v1.0.6.tar.gz
+export TJSON_DIR=$(pwd)/tjson-1.0.6
 cd ${TJSON_DIR}
 mkdir build
 cd build
-cmake ..
+# change "TCL_LIBRARY_DIR" and "TCL_INCLUDE_DIR" to the correct paths
+cmake .. \
+  -DTCL_LIBRARY_DIR=/usr/local/lib \
+  -DTCL_INCLUDE_DIR=/usr/local/include
 make
 make install
 tclsh ../examples/example1.tcl
