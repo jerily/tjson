@@ -378,7 +378,7 @@ static int jsonpath_eval(Tcl_Interp *interp, jsonpath_node_t *node, cJSON *root,
         Tcl_SetObjResult(interp, Tcl_NewStringObj("Invalid JSONPath: node is NULL", -1));
         return TCL_ERROR;
     }
-    fprintf(stderr, "jsonpath_eval, type: %d\n", node->type);
+    DBG(fprintf(stderr, "jsonpath_eval, type: %d\n", node->type));
     cJSON *item;
     switch (node->type) {
         case ROOT:
