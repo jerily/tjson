@@ -5,6 +5,7 @@ package require tjson
 namespace import -force ::tcltest::test
 
 ::tcltest::configure {*}$argv
+# ::tcltest::verbose start
 
 set json {
     { "store": {
