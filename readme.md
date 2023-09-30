@@ -33,7 +33,7 @@ package require tjson
 
 ## Build the tjson extension
 
-The following works for Linux and MacOS.
+The following works for Linux and MacOS. For windows, see the [Windows Build Instructions](docs/windows.md).
 
 ```bash
 For TCL:
