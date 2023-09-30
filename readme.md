@@ -4,6 +4,8 @@ TCL/C extension for parsing, manipulating, and querying JSON.
 
 ## Examples
 ```
+package require tjson
+
 # Parse JSON string and return a simple TCL structure
 # ::tjson::json_to_simple json_string
 
@@ -30,6 +32,10 @@ TCL/C extension for parsing, manipulating, and querying JSON.
 ```
 
 ## Build the tjson extension
+
+The following works for Linux and MacOS.
+
+```bash
 For TCL:
 ```bash
 # Build the TCL extension
@@ -43,9 +49,9 @@ cd build
 cmake .. \
   -DTCL_LIBRARY_DIR=/usr/local/lib \
   -DTCL_INCLUDE_DIR=/usr/local/include
-make
-make install
-tclsh ../examples/example1.tcl
+cmake --build .
+cmake --install .
+# tclsh8.6 ../examples/example1.tcl
 ```
 
 For NaviServer using Makefile:

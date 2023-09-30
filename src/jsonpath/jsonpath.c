@@ -41,9 +41,24 @@ typedef struct jsonpath_node {
 } jsonpath_node_t;
 
 jsonpath_node_t *jsonpath_node_new(jsonpath_node_enum_t type) {
-    jsonpath_node_t *node = malloc(sizeof(jsonpath_node_t));
+    jsonpath_node_t *node = (jsonpath_node_t *) Tcl_Alloc(sizeof(jsonpath_node_t));
     node->type = type;
+    node->next = NULL;
     return node;
+}
+
+char *jsonpath_strndup(const char *s, size_t n) {
+    if (s == NULL) {
+        return NULL;
+    }
+    size_t l = strnlen(s, n);
+    char *result = (char *) Tcl_Alloc(l + 1);
+    if (result == NULL) {
+        return NULL;
+    }
+    memcpy(result, s, l);
+    result[l] = '\0';
+    return result;
 }
 
 jsonpath_node_t *reverse_linked_list(jsonpath_node_t *head) {
@@ -65,15 +80,15 @@ void jsonpath_free(jsonpath_node_t *node) {
         jsonpath_node_t *next = curr->next;
         switch (curr->type) {
             case CHILD_NAME:
-                free(curr->data.child_name);
+                Tcl_Free(curr->data.child_name);
                 break;
             case INDICES_SET:
-                free(curr->data.indices_set.indices);
+                Tcl_Free((char *) curr->data.indices_set.indices);
                 break;
             default:
                 break;
         }
-        free(curr);
+        Tcl_Free((char *)curr);
         curr = next;
     }
 }
@@ -153,7 +168,7 @@ static int jsonpath_parse(Tcl_Interp *interp, const char *jsonpath, int length, 
                     }
                     DBG(fprintf(stderr, "child name: %.*s\n", (int) (p - curr - 2), curr + 2));
                     node = jsonpath_node_new(CHILD_NAME);
-                    node->data.child_name = strndup(curr + 2, p - curr - 2);
+                    node->data.child_name = jsonpath_strndup(curr + 2, p - curr - 2);
                     jsonpath_insert_node_to_list(node, nodes, &nodes_length);
                     curr = p;
                 } else if (curr[1] == '*') {
@@ -172,7 +187,9 @@ static int jsonpath_parse(Tcl_Interp *interp, const char *jsonpath, int length, 
                     }
                     DBG(fprintf(stderr, "child name: %.*s\n", (int) (p - curr - 1), curr + 1));
                     jsonpath_node_t *node = jsonpath_node_new(CHILD_NAME);
-                    node->data.child_name = strndup(curr + 1, p - curr - 1);
+
+                    node->data.child_name = jsonpath_strndup(curr + 1, p - curr - 1);
+
                     jsonpath_insert_node_to_list(node, nodes, &nodes_length);
                     curr = p;
                 }
@@ -218,8 +235,12 @@ static int jsonpath_parse(Tcl_Interp *interp, const char *jsonpath, int length, 
                             Tcl_SetObjResult(interp, Tcl_NewStringObj("Invalid JSONPath: ']' expected", -1));
                             return TCL_ERROR;
                         }
+
+                        DBG(fprintf(stderr, "child name: %.*s\n", (int) (p - curr - 2), curr + 2));
+
                         jsonpath_node_t *node = jsonpath_node_new(CHILD_NAME);
-                        node->data.child_name = strndup(curr + 2, p - curr - 2);
+                        node->data.child_name = jsonpath_strndup(curr + 2, p - curr - 2);
+
                         DBG(fprintf(stderr, "child name: %s\n", node->data.child_name));
                         jsonpath_insert_node_to_list(node, nodes, &nodes_length);
                         curr = p + 2;
@@ -263,7 +284,7 @@ static int jsonpath_parse(Tcl_Interp *interp, const char *jsonpath, int length, 
                     if (p[0] == ',') {
                         // case (b) set of indices
                         int k = 16;
-                        int *indices = malloc(sizeof(int) * k);
+                        int *indices = (int *) Tcl_Alloc(sizeof(int) * k);
                         int indices_length = 0;
                         indices[indices_length++] = index;
                         while (p[0] != ']') {
@@ -357,6 +378,7 @@ static int jsonpath_eval(Tcl_Interp *interp, jsonpath_node_t *node, cJSON *root,
         Tcl_SetObjResult(interp, Tcl_NewStringObj("Invalid JSONPath: node is NULL", -1));
         return TCL_ERROR;
     }
+    fprintf(stderr, "jsonpath_eval, type: %d\n", node->type);
     cJSON *item;
     switch (node->type) {
         case ROOT:
@@ -372,8 +394,9 @@ static int jsonpath_eval(Tcl_Interp *interp, jsonpath_node_t *node, cJSON *root,
                 }
                 return TCL_OK;
             }
+            break;
         case CHILD_NAME:
-            DBG(fprintf(stderr, "eval,child_name: %s\n", node->data.child_name));
+            DBG(fprintf(stderr, "eval,child_name: %d %p %p\n", node->type, node->next, node->data.child_name));
             item = cJSON_GetObjectItemCaseSensitive(root, node->data.child_name);
             if (item == NULL) {
                 return TCL_OK;
@@ -418,15 +441,17 @@ static int jsonpath_eval(Tcl_Interp *interp, jsonpath_node_t *node, cJSON *root,
                     item = root->child;
                     while (item != NULL) {
                         if (node->next->type == CHILD_NAME && strcmp(node->next->data.child_name, item->string) == 0) {
-                            DBG(fprintf(stderr, "eval,deep_scan object,entering: %s\n", item->string));
+                            DBG(fprintf(stderr, "eval,deep scan object,entering: %s\n", item->string));
                             if (TCL_OK != jsonpath_eval(interp, node->next, root, result)) {
                                 return TCL_ERROR;
                             }
+                            DBG(fprintf(stderr, "eval,deep scan object,leaving: %s\n", item->string));
                         } else {
-                            DBG(fprintf(stderr, "eval,deep scan object: %s %s\n", node->next->data.child_name, item->string));
+                            DBG(fprintf(stderr, "eval,deep scan object (in): %s %s\n", node->next->data.child_name, item->string));
                             if (TCL_OK != jsonpath_eval(interp, node, item, result)) {
                                 return TCL_ERROR;
                             }
+                            DBG(fprintf(stderr, "eval,deep scan object (out): %s %s\n", node->next->data.child_name, item->string));
                         }
                         item = item->next;
                     }
@@ -435,12 +460,12 @@ static int jsonpath_eval(Tcl_Interp *interp, jsonpath_node_t *node, cJSON *root,
                     item = root->child;
                     for (int i = 0; item != NULL; item = item->next, i++) {
                         if (node->next->type == CHILD_INDEX && node->next->data.child_index == i) {
-                            DBG(fprintf(stderr, "eval,deep_scan array,entering: %d\n", i));
+                            DBG(fprintf(stderr, "eval,deep scan array,entering: %d\n", i));
                             if (TCL_OK != jsonpath_eval(interp, node->next, root, result)) {
                                 return TCL_ERROR;
                             }
                         } else {
-                            DBG(fprintf(stderr, "eval,deep_scan array: %d\n", i));
+                            DBG(fprintf(stderr, "eval,deep scan array: %d\n", i));
                             if (TCL_OK != jsonpath_eval(interp, node, item, result)) {
                                 return TCL_ERROR;
                             }
