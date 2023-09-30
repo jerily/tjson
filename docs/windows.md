@@ -10,6 +10,11 @@ In order to compile the tjson extension for Windows, you need the following:
 
 ## Win32
 
+Open "Developer Powershell for VS 2022" as Administrator
+and run the following commands:
+
+```
+
 Build TCL:
 
 ```bash
@@ -22,8 +27,9 @@ nmake -f makefile.vc install
 
 Build tjson extension on windows:
 
-```bash
-cd ${TJSON_DIR}
+```
+# Download tjson source code and unzip it to a directory of your choice.
+cd c:/path/to/tjson
 mkdir build
 cd build
 cmake .. \
