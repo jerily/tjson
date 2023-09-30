@@ -1,14 +1,12 @@
 # tjson - Installation Guide for Windows
 
-
-
 ## Prerequisites
 
 In order to compile the tjson extension for Windows, you need the following:
 
 - [Visual Studio 2022](https://visualstudio.microsoft.com/downloads/)
 
-## Win32
+## Build TCL
 
 Open "Developer Powershell for VS 2022" as Administrator
 and run the following commands:
@@ -32,6 +30,9 @@ Build tjson extension on windows:
 cd c:/path/to/tjson
 mkdir build
 cd build
+# If you want to build for 64-bit, use -A x64 instead of -A Win32.
+# but note that TCL figured out the compiler architecture
+# and version automatically when it was built in the previous step.
 cmake .. \
   -A Win32 \
   -DTCL_LIBRARY_DIR="C:/Tcl/lib" \
