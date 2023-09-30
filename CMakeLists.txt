@@ -1,11 +1,19 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(tjson VERSION 1.0.8 LANGUAGES C)
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 set(TARGET tjson)
 set(CMAKE_C_STANDARD   11)
 set(CMAKE_C_STANDARD_REQUIRED true)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
+
+if(WIN32)
+    # Prefix all shared libraries with 'lib'.
+    set(CMAKE_SHARED_LIBRARY_PREFIX "lib")
+    # Prefix all static libraries with 'lib'.
+    set(CMAKE_STATIC_LIBRARY_PREFIX "lib")
+endif()
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 find_package(TCL EXACT 8.6.13 REQUIRED)  # TCL_INCLUDE_PATH TCL_LIBRARY
 
 message(STATUS "TCL_INCLUDE_PATH: ${TCL_INCLUDE_PATH}")

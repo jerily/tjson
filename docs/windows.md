@@ -31,6 +31,6 @@ cmake .. \
   -DTCL_LIBRARY_DIR="C:/Tcl/lib" \
   -DTCL_INCLUDE_DIR="C:/Tcl/include" \
   -DTCL_LIBRARY="C:/Tcl/lib/tcl86t.lib"
-cmake --build .
-cmake --install .
+cmake --build . --config=Release
+cmake --install . --config=Release
 ```
