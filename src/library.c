@@ -42,6 +42,13 @@ static int tjson_ModuleInitialized;
 static Tcl_HashTable tjson_NodeToInternal_HT;
 static Tcl_Mutex tjson_NodeToInternal_HT_Mutex;
 
+typedef struct {
+    Tcl_Interp *interp;
+    char *handle;
+    char *varname;
+    cJSON *item;
+} tjson_trace_t;
+
 static int
 tjson_RegisterNode(const char *name, cJSON *internal) {
 
@@ -279,9 +286,53 @@ static int tjson_JsonToSimpleCmd(ClientData  clientData, Tcl_Interp *interp, int
     return TCL_OK;
 }
 
+char *tjson_VarTraceProc(ClientData clientData, Tcl_Interp *interp, const char *name1, const char *name2, int flags) {
+    tjson_trace_t *trace = (tjson_trace_t *) clientData;
+    if (trace->item == NULL) {
+        DBG(fprintf(stderr, "VarTraceProc: node has been deleted\n"));
+        if (!Tcl_InterpDeleted(trace->interp)) {
+            Tcl_UntraceVar(trace->interp, trace->varname, TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
+                           (Tcl_VarTraceProc*) tjson_VarTraceProc,
+                           (ClientData) clientData);
+        }
+        Tcl_Free((char *) trace->varname);
+        Tcl_Free((char *) trace->handle);
+        Tcl_Free((char *) trace);
+        return NULL;
+    }
+    if (flags & TCL_TRACE_WRITES) {
+        DBG(fprintf(stderr, "VarTraceProc: TCL_TRACE_WRITES\n"));
+        Tcl_SetVar2(trace->interp, name1, name2, trace->handle, TCL_LEAVE_ERR_MSG);
+        return "var is read-only";
+    }
+    if (flags & TCL_TRACE_UNSETS) {
+        DBG(fprintf(stderr, "VarTraceProc: TCL_TRACE_UNSETS\n"));
+        tjson_UnregisterNode(trace->handle);
+        cJSON_Delete(trace->item);
+        Tcl_Free((char *) trace->varname);
+        Tcl_Free((char *) trace->handle);
+        Tcl_Free((char *) trace);
+    }
+    return NULL;
+}
+
+static char *tjson_strndup(const char *s, size_t n) {
+    if (s == NULL) {
+        return NULL;
+    }
+    size_t l = strnlen(s, n);
+    char *result = (char *) Tcl_Alloc(l + 1);
+    if (result == NULL) {
+        return NULL;
+    }
+    memcpy(result, s, l);
+    result[l] = '\0';
+    return result;
+}
+
 static int tjson_ParseCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
     DBG(fprintf(stderr, "ParseCmd\n"));
-    CheckArgs(2,2,1,"json");
+    CheckArgs(2,3,1,"json ?varname?");
 
     int length;
     const char *json = Tcl_GetStringFromObj(objv[1], &length);
@@ -298,6 +349,20 @@ static int tjson_ParseCmd(ClientData  clientData, Tcl_Interp *interp, int objc, 
     char handle[80];
     CMD_NAME(handle, root_structure);
     tjson_RegisterNode(handle, root_structure);
+
+    if (objc == 3) {
+        tjson_trace_t *trace = (tjson_trace_t *) Tcl_Alloc(sizeof(tjson_trace_t));
+        trace->interp = interp;
+        trace->varname = tjson_strndup(Tcl_GetString(objv[2]), 80);
+        trace->handle = tjson_strndup(handle, 80);
+        trace->item = root_structure;
+        const char *objVar = Tcl_GetString(objv[2]);
+        Tcl_UnsetVar(interp, objVar, 0);
+        Tcl_SetVar  (interp, objVar, handle, 0);
+        Tcl_TraceVar(interp,objVar,TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
+                     (Tcl_VarTraceProc*) tjson_VarTraceProc,
+                     (ClientData) trace);
+    }
 
     Tcl_SetObjResult(interp, Tcl_NewStringObj(handle, -1));
     return TCL_OK;
@@ -418,10 +483,9 @@ static int tjson_CreateItemFromSpec(Tcl_Interp *interp, Tcl_Obj *specPtr, cJSON 
     }
 }
 
-
 static int tjson_CreateCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
     DBG(fprintf(stderr, "CreateCmd\n"));
-    CheckArgs(2,2,1,"typed_item_spec");
+    CheckArgs(2,3,1,"typed_item_spec ?varname?");
 
     cJSON *item = NULL;
     if (TCL_OK != tjson_CreateItemFromSpec(interp, objv[1], &item)) {
@@ -431,6 +495,20 @@ static int tjson_CreateCmd(ClientData  clientData, Tcl_Interp *interp, int objc,
     char handle[80];
     CMD_NAME(handle, item);
     tjson_RegisterNode(handle, item);
+
+    if (objc == 3) {
+        tjson_trace_t *trace = (tjson_trace_t *) Tcl_Alloc(sizeof(tjson_trace_t));
+        trace->interp = interp;
+        trace->varname = tjson_strndup(Tcl_GetString(objv[2]), 80);
+        trace->handle = tjson_strndup(handle, 80);
+        trace->item = item;
+        const char *objVar = Tcl_GetString(objv[2]);
+        Tcl_UnsetVar(interp, objVar, 0);
+        Tcl_SetVar  (interp, objVar, handle, 0);
+        Tcl_TraceVar(interp,objVar,TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
+                     (Tcl_VarTraceProc*) tjson_VarTraceProc,
+                     (ClientData) trace);
+    }
 
     Tcl_SetObjResult(interp, Tcl_NewStringObj(handle, -1));
     return TCL_OK;
