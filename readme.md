@@ -69,9 +69,9 @@ make install
     - returns a typed TCL structure (pairs of types and values, M for object, L for list, S for string, N for number, BOOL for boolean)
 * **::tjson::typed_to_json** *typed_spec*
     - returns a JSON string from a typed TCL structure (like the one returned by ::tjson::json_to_typed)
-* **::tjson::parse** *json_string*
+* **::tjson::parse** *json_string* *?varname?*
     - returns a handle to manipulate the JSON string
-* **::tjson::create** *typed_spec*
+* **::tjson::create** *typed_spec* *?varname?*
     - returns a handle to manipulate the JSON of the typed TCL structure
 * **::tjson::destroy** *handle*
     - destroys the JSON node structure for the given handle
