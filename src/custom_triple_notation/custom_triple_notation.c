@@ -2,6 +2,14 @@
 #include <string.h>
 #include "custom_triple_notation.h"
 
+#ifndef TCL_SIZE_MAX
+typedef int Tcl_Size;
+# define Tcl_GetSizeIntFromObj Tcl_GetIntFromObj
+# define Tcl_NewSizeIntObj Tcl_NewIntObj
+# define TCL_SIZE_MAX      INT_MAX
+# define TCL_SIZE_MODIFIER ""
+#endif
+
 // The triple notation is a flat list containing triples of the form
 //
 //    NAME TYPE VALUE
@@ -29,7 +37,7 @@
 int tjson_CustomToTyped(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj **resultPtr);
 
 static int tjson_CustomConvertTypeValueToTyped(Tcl_Interp *interp, Tcl_Obj *typePtr, Tcl_Obj *valuePtr, Tcl_Obj **resultPtr) {
-    int type_length;
+    Tcl_Size type_length;
     const char *type = Tcl_GetStringFromObj(typePtr, &type_length);
     switch (type[0]) {
         case 's':
@@ -146,7 +154,7 @@ static int tjson_CustomConvertTypeValueToTyped(Tcl_Interp *interp, Tcl_Obj *type
             break;
         case 'a':
             if (type_length == 5 && 0 == strcmp("array", type)) {
-                int arrObjc;
+                Tcl_Size arrObjc;
                 Tcl_Obj **arrObjv;
                 if (TCL_OK != Tcl_ListObjGetElements(interp, valuePtr, &arrObjc, &arrObjv) || (arrObjc % 3 != 0)) {
                     Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid array triple notation spec", -1));
@@ -184,7 +192,7 @@ static int tjson_CustomConvertTypeValueToTyped(Tcl_Interp *interp, Tcl_Obj *type
         case 't':
             if (type_length == 9 && 0 == strcmp("timestamp", type)) {
                 // check that "valuePtr" is a list of two elements
-                int value_length;
+                Tcl_Size value_length;
                 if (TCL_OK != Tcl_ListObjLength(interp, valuePtr, &value_length) || value_length != 2) {
                     Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid timestamp", -1));
                     return TCL_ERROR;
@@ -231,7 +239,7 @@ static int tjson_CustomConvertTypeValueToTyped(Tcl_Interp *interp, Tcl_Obj *type
         case 'r':
             if (type_length == 5 && 0 == strcmp("regex", type)) {
                 // check that "valuePtr" is a list of two elements
-                int value_length;
+                Tcl_Size value_length;
                 if (TCL_OK != Tcl_ListObjLength(interp, valuePtr, &value_length) || value_length != 2) {
                     Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid regex", -1));
                     return TCL_ERROR;
@@ -306,7 +314,7 @@ static int tjson_CustomConvertTypeValueToTyped(Tcl_Interp *interp, Tcl_Obj *type
 
 int tjson_CustomToTyped(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj **resultPtr) {
 
-    int objc;
+    Tcl_Size objc;
     Tcl_Obj **objv;
     if (TCL_OK != Tcl_ListObjGetElements(interp, specPtr, &objc, &objv) || (objc % 3 != 0)) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid triple notation spec", -1));
@@ -339,7 +347,7 @@ static int tjson_TypedConvertTimestampToCustom(Tcl_Interp *interp, Tcl_Obj *spec
     // "i" is a list of two elements, the first of which is "N" and the second is the increment
 
     // check if "specPtr" is a list of two elements
-    int spec_length;
+    Tcl_Size spec_length;
     if (TCL_OK != Tcl_ListObjLength(interp, specPtr, &spec_length) || spec_length != 2) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, spec length != 2", -1));
         return TCL_ERROR;
@@ -353,7 +361,7 @@ static int tjson_TypedConvertTimestampToCustom(Tcl_Interp *interp, Tcl_Obj *spec
         Tcl_SetObjResult(interp, Tcl_NewStringObj("error while extracting type and value from typed", -1));
         return TCL_ERROR;
     }
-    int type_length;
+    Tcl_Size type_length;
     const char *type = Tcl_GetStringFromObj(typePtr, &type_length);
     if (type_length != 1 || type[0] != 'M') {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, type != M inside $timestamp", -1));
@@ -362,21 +370,21 @@ static int tjson_TypedConvertTimestampToCustom(Tcl_Interp *interp, Tcl_Obj *spec
 
     Tcl_Obj *tTypedPtr;
     Tcl_Obj *iTypedPtr;
-    int dict_size;
+    Tcl_Size dict_size;
     if (TCL_OK == Tcl_DictObjSize(interp, valuePtr, &dict_size)
         && dict_size == 2
         && TCL_OK == Tcl_DictObjGet(interp, valuePtr, Tcl_NewStringObj("t", -1), &tTypedPtr)
         && TCL_OK == Tcl_DictObjGet(interp, valuePtr, Tcl_NewStringObj("i", -1), &iTypedPtr)) {
 
         // check if "tTypedPtr" is a list of two elements
-        int tTyped_length;
+        Tcl_Size tTyped_length;
         if (TCL_OK != Tcl_ListObjLength(interp, tTypedPtr, &tTyped_length) || tTyped_length != 2) {
             Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, tTyped length != 2", -1));
             return TCL_ERROR;
         }
 
         // check if "iTypedPtr" is a list of two elements
-        int iTyped_length;
+        Tcl_Size iTyped_length;
         if (TCL_OK != Tcl_ListObjLength(interp, iTypedPtr, &iTyped_length) || iTyped_length != 2) {
             Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, iTyped length != 2", -1));
             return TCL_ERROR;
@@ -391,9 +399,9 @@ static int tjson_TypedConvertTimestampToCustom(Tcl_Interp *interp, Tcl_Obj *spec
             return TCL_ERROR;
         }
 
-        int tTypedType_length;
+        Tcl_Size tTypedType_length;
         const char *tTypedType = Tcl_GetStringFromObj(tTypedTypePtr, &tTypedType_length);
-        int iTypedType_length;
+        Tcl_Size iTypedType_length;
         const char *iTypedType = Tcl_GetStringFromObj(iTypedTypePtr, &iTypedType_length);
         if (tTypedType_length != 1 || iTypedType_length != 1
             || tTypedType[0] != 'N' || iTypedType[0] != 'N') {
@@ -433,7 +441,7 @@ static int tjson_TypedConvertRegularExpressionToCustom(Tcl_Interp *interp, Tcl_O
     // "pattern" is a list of two elements, the first of which is "S" and the second is the pattern
     // "options" is a list of two elements, the first of which is "S" and the second is the options
     // check if "specPtr" is a list of two elements
-    int spec_length;
+    Tcl_Size spec_length;
     if (TCL_OK != Tcl_ListObjLength(interp, specPtr, &spec_length) || spec_length != 2) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, spec length != 2", -1));
         return TCL_ERROR;
@@ -447,7 +455,7 @@ static int tjson_TypedConvertRegularExpressionToCustom(Tcl_Interp *interp, Tcl_O
         Tcl_SetObjResult(interp, Tcl_NewStringObj("error while extracting type and value from typed", -1));
         return TCL_ERROR;
     }
-    int type_length;
+    Tcl_Size type_length;
     const char *type = Tcl_GetStringFromObj(typePtr, &type_length);
     if (type_length != 1 || type[0] != 'M') {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, type != M inside $regularExpression", -1));
@@ -456,21 +464,21 @@ static int tjson_TypedConvertRegularExpressionToCustom(Tcl_Interp *interp, Tcl_O
 
     Tcl_Obj *patternTypedPtr;
     Tcl_Obj *optionsTypedPtr;
-    int dict_size;
+    Tcl_Size dict_size;
     if (TCL_OK == Tcl_DictObjSize(interp, valuePtr, &dict_size)
         && dict_size == 2
         && TCL_OK == Tcl_DictObjGet(interp, valuePtr, Tcl_NewStringObj("pattern", -1), &patternTypedPtr)
         && TCL_OK == Tcl_DictObjGet(interp, valuePtr, Tcl_NewStringObj("options", -1), &optionsTypedPtr)) {
 
         // check if "patternTypedPtr" is a list of two elements
-        int patternTyped_length;
+        Tcl_Size patternTyped_length;
         if (TCL_OK != Tcl_ListObjLength(interp, patternTypedPtr, &patternTyped_length) || patternTyped_length != 2) {
             Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, patternTyped length != 2", -1));
             return TCL_ERROR;
         }
 
         // check if "optionsTypedPtr" is a list of two elements
-        int optionsTyped_length;
+        Tcl_Size optionsTyped_length;
         if (TCL_OK != Tcl_ListObjLength(interp, optionsTypedPtr, &optionsTyped_length) || optionsTyped_length != 2) {
             Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, optionsTyped length != 2", -1));
             return TCL_ERROR;
@@ -485,9 +493,9 @@ static int tjson_TypedConvertRegularExpressionToCustom(Tcl_Interp *interp, Tcl_O
             return TCL_ERROR;
         }
 
-        int patternTypedType_length;
+        Tcl_Size patternTypedType_length;
         const char *patternTypedType = Tcl_GetStringFromObj(patternTypedTypePtr, &patternTypedType_length);
-        int optionsTypedType_length;
+        Tcl_Size optionsTypedType_length;
         const char *optionsTypedType = Tcl_GetStringFromObj(optionsTypedTypePtr, &optionsTypedType_length);
         if (patternTypedType_length != 1 || optionsTypedType_length != 1
             || patternTypedType[0] != 'S' || optionsTypedType[0] != 'S') {
@@ -524,7 +532,7 @@ static int tjson_TypedConvertRegularExpressionToCustom(Tcl_Interp *interp, Tcl_O
 
 static int tjson_TypedConvertNumberIntToCustom(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj **resultPtr) {
     // check if "specPtr" is a list of two elements
-    int spec_length;
+    Tcl_Size spec_length;
     if (TCL_OK != Tcl_ListObjLength(interp, specPtr, &spec_length) || spec_length != 2) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, spec length != 2", -1));
         return TCL_ERROR;
@@ -538,7 +546,7 @@ static int tjson_TypedConvertNumberIntToCustom(Tcl_Interp *interp, Tcl_Obj *spec
         Tcl_SetObjResult(interp, Tcl_NewStringObj("error while extracting type and value from typed", -1));
         return TCL_ERROR;
     }
-    int type_length;
+    Tcl_Size type_length;
     const char *type = Tcl_GetStringFromObj(typePtr, &type_length);
     if (type_length != 1 || type[0] != 'N') {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, type != N inside $numberInt", -1));
@@ -562,7 +570,7 @@ static int tjson_TypedConvertNumberIntToCustom(Tcl_Interp *interp, Tcl_Obj *spec
 
 static int tjson_TypedConvertNumberLongToCustom(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj **resultPtr) {
     // check if "specPtr" is a list of two elements
-    int spec_length;
+    Tcl_Size spec_length;
     if (TCL_OK != Tcl_ListObjLength(interp, specPtr, &spec_length) || spec_length != 2) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, spec length != 2", -1));
         return TCL_ERROR;
@@ -576,7 +584,7 @@ static int tjson_TypedConvertNumberLongToCustom(Tcl_Interp *interp, Tcl_Obj *spe
         Tcl_SetObjResult(interp, Tcl_NewStringObj("error while extracting type and value from typed", -1));
         return TCL_ERROR;
     }
-    int type_length;
+    Tcl_Size type_length;
     const char *type = Tcl_GetStringFromObj(typePtr, &type_length);
     if (type_length != 1 || type[0] != 'N') {
         fprintf(stderr, "type: %s\n", type);
@@ -602,7 +610,7 @@ static int tjson_TypedConvertNumberLongToCustom(Tcl_Interp *interp, Tcl_Obj *spe
 
 static int tjson_TypedConvertNumberDoubleToCustom(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj **resultPtr) {
     // check if "specPtr" is a list of two elements
-    int spec_length;
+    Tcl_Size spec_length;
     if (TCL_OK != Tcl_ListObjLength(interp, specPtr, &spec_length) || spec_length != 2) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, spec length != 2", -1));
         return TCL_ERROR;
@@ -616,7 +624,7 @@ static int tjson_TypedConvertNumberDoubleToCustom(Tcl_Interp *interp, Tcl_Obj *s
         Tcl_SetObjResult(interp, Tcl_NewStringObj("error while extracting type and value from typed", -1));
         return TCL_ERROR;
     }
-    int type_length;
+    Tcl_Size type_length;
     const char *type = Tcl_GetStringFromObj(typePtr, &type_length);
     if (type_length != 1 || type[0] != 'N') {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, type != N inside $numberDouble", -1));
@@ -657,7 +665,7 @@ static int tjson_TypedConvertOidToCustom(Tcl_Interp *interp, Tcl_Obj *specPtr, T
 
 
     // check if "specPtr" is a list of two elements
-    int spec_length;
+    Tcl_Size spec_length;
     if (TCL_OK != Tcl_ListObjLength(interp, specPtr, &spec_length) || spec_length != 2) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, spec length != 2", -1));
         return TCL_ERROR;
@@ -672,7 +680,7 @@ static int tjson_TypedConvertOidToCustom(Tcl_Interp *interp, Tcl_Obj *specPtr, T
         return TCL_ERROR;
     }
 
-    int type_length;
+    Tcl_Size type_length;
     const char *type = Tcl_GetStringFromObj(typePtr, &type_length);
     if (type_length != 1 || type[0] != 'S') {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, type != M inside $oid", -1));
@@ -680,7 +688,7 @@ static int tjson_TypedConvertOidToCustom(Tcl_Interp *interp, Tcl_Obj *specPtr, T
     }
 
     // try to read string from "oidValueValuePtr"
-    int value_length;
+    Tcl_Size value_length;
     const char *value = Tcl_GetStringFromObj(valuePtr, &value_length);
 
     // "resultPtr" is a list of the form {N <value>}
@@ -698,7 +706,7 @@ static int tjson_TypedConvertDateToCustom(Tcl_Interp *interp, Tcl_Obj *specPtr, 
     // "value" must be a long
 
     // check if "specPtr" is a list of two elements
-    int spec_length;
+    Tcl_Size spec_length;
     if (TCL_OK != Tcl_ListObjLength(interp, specPtr, &spec_length) || spec_length != 2) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, spec length != 2", -1));
         return TCL_ERROR;
@@ -713,7 +721,7 @@ static int tjson_TypedConvertDateToCustom(Tcl_Interp *interp, Tcl_Obj *specPtr, 
         return TCL_ERROR;
     }
 
-    int type_length;
+    Tcl_Size type_length;
     const char *type = Tcl_GetStringFromObj(typePtr, &type_length);
     if (type_length != 1 || type[0] != 'M') {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, type != M inside $date", -1));
@@ -721,7 +729,7 @@ static int tjson_TypedConvertDateToCustom(Tcl_Interp *interp, Tcl_Obj *specPtr, 
     }
 
     // check if "valuePtr" is a dict
-    int dict_size;
+    Tcl_Size dict_size;
     if (TCL_OK != Tcl_DictObjSize(interp, valuePtr, &dict_size) || dict_size != 1) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, value not a dict", -1));
         return TCL_ERROR;
@@ -743,7 +751,7 @@ static int tjson_TypedConvertDateToCustom(Tcl_Interp *interp, Tcl_Obj *specPtr, 
         return TCL_ERROR;
     }
 
-    int numberLongType_length;
+    Tcl_Size numberLongType_length;
     const char *numberLongType = Tcl_GetStringFromObj(numberLongTypePtr, &numberLongType_length);
     if (numberLongType_length != 1 || numberLongType[0] != 'N') {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, type != N inside $date", -1));
@@ -767,7 +775,7 @@ static int tjson_TypedConvertDateToCustom(Tcl_Interp *interp, Tcl_Obj *specPtr, 
 
 static int tjson_TypedConvertTypeValueToCustom(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj **resultPtr) {
     // "specPtr" must be a list of two elements, the first of which must be the "type" and the second the "value"
-    int length;
+    Tcl_Size length;
     if (TCL_OK != Tcl_ListObjLength(interp, specPtr, &length) || length != 2) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, must be a list of two elements", -1));
         return TCL_ERROR;
@@ -781,7 +789,7 @@ static int tjson_TypedConvertTypeValueToCustom(Tcl_Interp *interp, Tcl_Obj *spec
         return TCL_ERROR;
     }
 
-    int type_length;
+    Tcl_Size type_length;
     const char *type = Tcl_GetStringFromObj(typePtr, &type_length);
     switch(type[0]) {
         case 'S':
@@ -846,7 +854,7 @@ static int tjson_TypedConvertTypeValueToCustom(Tcl_Interp *interp, Tcl_Obj *spec
             break;
         case 'L':
             if (type_length == 1) {
-                int arrObjc;
+                Tcl_Size arrObjc;
                 Tcl_Obj **arrObjv;
                 if (TCL_OK != Tcl_ListObjGetElements(interp, valuePtr, &arrObjc, &arrObjv)) {
                     Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid array triple notation spec", -1));
@@ -895,7 +903,7 @@ static int tjson_TypedConvertTypeValueToCustom(Tcl_Interp *interp, Tcl_Obj *spec
                 //      "$date -> {M <dict>}
                 //      "$regularExpression -> {M <dict>}
 
-                int dict_size;
+                Tcl_Size dict_size;
                 if (TCL_OK == Tcl_DictObjSize(interp, valuePtr, &dict_size) && dict_size == 1) {
                     Tcl_DictSearch search;
                     Tcl_Obj *dictKeyPtr;
@@ -905,7 +913,7 @@ static int tjson_TypedConvertTypeValueToCustom(Tcl_Interp *interp, Tcl_Obj *spec
                         Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, first from dict", -1));
                         return TCL_ERROR;
                     }
-                    int dict_key_length;
+                    Tcl_Size dict_key_length;
                     const char *dict_key = Tcl_GetStringFromObj(dictKeyPtr, &dict_key_length);
                     if (dict_key_length == 10 && 0 == strncmp("$timestamp", dict_key, dict_key_length)) {
                         if (TCL_OK != tjson_TypedConvertTimestampToCustom(interp, dictValuePtr, resultPtr)) {
@@ -977,7 +985,7 @@ static int tjson_TypedConvertTypeValueToCustom(Tcl_Interp *interp, Tcl_Obj *spec
                     }
 
                     // extract "convertedTypePtr" and "convertedValuePtr" from "convertedPtr"
-                    int converted_length;
+                    Tcl_Size converted_length;
                     if (TCL_OK != Tcl_ListObjLength(interp, convertedPtr, &converted_length) ||
                         converted_length != 2) {
                         fprintf(stderr, "converted: %s\n", Tcl_GetString(convertedPtr));
@@ -1015,7 +1023,7 @@ static int tjson_TypedConvertTypeValueToCustom(Tcl_Interp *interp, Tcl_Obj *spec
 
 int tjson_TypedToCustom(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj **resultPtr) {
     // "specPtr" must be a list with two elements, the first of which must be the type and the second the value
-    int length;
+    Tcl_Size length;
     if (TCL_OK != Tcl_ListObjLength(interp, specPtr, &length) || length != 2) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid typed spec, must be a list of two elements", -1));
         return TCL_ERROR;
@@ -1029,7 +1037,7 @@ int tjson_TypedToCustom(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj **resultPt
         return TCL_ERROR;
     }
 
-    int type_length;
+    Tcl_Size type_length;
     const char *type = Tcl_GetStringFromObj(typePtr, &type_length);
 
     if (type[0] != 'M') {
@@ -1055,9 +1063,8 @@ int tjson_TypedToCustom(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_Obj **resultPt
         }
 
         // extract "convertedTypePtr" and "convertedValuePtr" from "convertedPtr"
-        int converted_length;
+        Tcl_Size converted_length;
         if (TCL_OK != Tcl_ListObjLength(interp, convertedPtr, &converted_length) || converted_length != 2) {
-            fprintf(stderr, "converted_length: %d\n", converted_length);
             Tcl_SetObjResult(interp, Tcl_NewStringObj("converted must be a list of two elements", -1));
             return TCL_ERROR;
         }

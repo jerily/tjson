@@ -12,6 +12,14 @@
 #include <math.h>
 #include <stdlib.h>
 
+#ifndef TCL_SIZE_MAX
+typedef int Tcl_Size;
+# define Tcl_GetSizeIntFromObj Tcl_GetIntFromObj
+# define Tcl_NewSizeIntObj Tcl_NewIntObj
+# define TCL_SIZE_MAX      INT_MAX
+# define TCL_SIZE_MODIFIER ""
+#endif
+
 #define XSTR(s) STR(s)
 #define STR(s) #s
 
@@ -252,7 +260,7 @@ static int tjson_JsonToTypedCmd(ClientData  clientData, Tcl_Interp *interp, int 
     DBG(fprintf(stderr, "JsonToTypedCmd\n"));
     CheckArgs(2,2,1,"json");
 
-    int length;
+    Tcl_Size length;
     const char *json = Tcl_GetStringFromObj(objv[1], &length);
 
     if (length > 0) {
@@ -269,7 +277,7 @@ static int tjson_JsonToSimpleCmd(ClientData  clientData, Tcl_Interp *interp, int
     DBG(fprintf(stderr, "JsonToSimpleCmd\n"));
     CheckArgs(2,2,1,"json");
 
-    int length;
+    Tcl_Size length;
     const char *json = Tcl_GetStringFromObj(objv[1], &length);
 
     if (length > 0) {
@@ -334,7 +342,7 @@ static int tjson_ParseCmd(ClientData  clientData, Tcl_Interp *interp, int objc, 
     DBG(fprintf(stderr, "ParseCmd\n"));
     CheckArgs(2,3,1,"json ?varname?");
 
-    int length;
+    Tcl_Size length;
     const char *json = Tcl_GetStringFromObj(objv[1], &length);
     if (length == 0) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("empty json", -1));
@@ -421,7 +429,7 @@ static int tjson_CreateItemFromSpec(Tcl_Interp *interp, Tcl_Obj *specPtr, cJSON 
     double value_double;
     cJSON *obj;
     cJSON *arr;
-    int typeLength;
+    Tcl_Size typeLength;
     const char *type = Tcl_GetStringFromObj(typePtr, &typeLength);
     switch (type[0]) {
         case 'S':
@@ -821,7 +829,7 @@ static int tjson_ToTypedCmd(ClientData  clientData, Tcl_Interp *interp, int objc
 }
 
 static int tjson_EscapeJsonString(Tcl_Obj *objPtr, Tcl_DString *dsPtr) {
-    int length;
+    Tcl_Size length;
     const char *str = Tcl_GetStringFromObj(objPtr, &length);
     // loop through each character of the input string
     for (int i = 0; i < length; i++) {
@@ -884,7 +892,7 @@ static int tjson_TreeToJson(Tcl_Interp *interp, cJSON *item, int num_spaces, Tcl
                 Tcl_DStringAppend(dsPtr, "null", 4);
                 return TCL_OK;
             } else if(d == (double)item->valueint) {
-                int intstr_length;
+                Tcl_Size intstr_length;
                 Tcl_Obj *intObjPtr = Tcl_NewIntObj(item->valueint);
                 Tcl_IncrRefCount(intObjPtr);
                 const char *intstr = Tcl_GetStringFromObj(intObjPtr, &intstr_length);
@@ -892,7 +900,7 @@ static int tjson_TreeToJson(Tcl_Interp *interp, cJSON *item, int num_spaces, Tcl
                 Tcl_DecrRefCount(intObjPtr);
                 return TCL_OK;
             } else {
-                int doublestr_length;
+                Tcl_Size doublestr_length;
                 Tcl_Obj *doubleObjPtr = Tcl_NewDoubleObj(item->valuedouble);
                 Tcl_IncrRefCount(doubleObjPtr);
                 const char *doublestr = Tcl_GetStringFromObj(doubleObjPtr, &doublestr_length);
@@ -1062,7 +1070,7 @@ static int tjson_QueryCmd(ClientData  clientData, Tcl_Interp *interp, int objc, 
         return TCL_ERROR;
     }
 
-    int length;
+    Tcl_Size length;
     const char *jsonpath = Tcl_GetStringFromObj(objv[2], &length);
     jsonpath_result_t result;
     result.k = 16;
@@ -1148,9 +1156,9 @@ static int serialize(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_DString *dsPtr) {
     Tcl_Obj *typePtr, *valuePtr;
     Tcl_ListObjIndex(interp, specPtr, 0, &typePtr);
     Tcl_ListObjIndex(interp, specPtr, 1, &valuePtr);
-    int typeLength;
+    Tcl_Size typeLength;
     const char *type = Tcl_GetStringFromObj(typePtr, &typeLength);
-    int numstr_length;
+    Tcl_Size numstr_length;
     const char *numstr;
     switch(type[0]) {
         case 'S':
@@ -1192,14 +1200,6 @@ static int serialize(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_DString *dsPtr) {
 static int tjson_TypedToJsonCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
     DBG(fprintf(stderr, "TypedToJsonCmd\n"));
     CheckArgs(2,2,1,"typed_spec");
-
-    int length;
-    const char *json = Tcl_GetStringFromObj(objv[1], &length);
-
-    int simple = 0;
-    if (objc == 3) {
-        Tcl_GetBoolean(interp, Tcl_GetString(objv[2]), &simple);
-    }
 
     Tcl_DString ds;
     Tcl_DStringInit(&ds);
@@ -1273,7 +1273,12 @@ void tjson_InitModule() {
 }
 
 int Tjson_Init(Tcl_Interp *interp) {
-    if (Tcl_InitStubs(interp, "8.6", 0) == NULL) {
+
+    int major, minor, patchLevel, type;
+    Tcl_GetVersion(&major, &minor, &patchLevel, &type);
+
+    const char *version = major == 9 ? "9.0" : "8.6";
+    if (Tcl_InitStubs(interp, version, 0) == NULL) {
         return TCL_ERROR;
     }
 
