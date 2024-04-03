@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22.1)
-project(tjson VERSION 1.0.10 LANGUAGES C)
+project(tjson VERSION 1.0.11 LANGUAGES C)
 
 set(TARGET tjson)
 set(CMAKE_C_STANDARD   11)
