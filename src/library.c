@@ -416,7 +416,7 @@ static int tjson_SizeCmd(ClientData  clientData, Tcl_Interp *interp, int objc, T
 
 static int tjson_CreateItemFromSpec(Tcl_Interp *interp, Tcl_Obj *specPtr, cJSON **item) {
     // "specPtr" is a list of two elements: type and value
-    int length;
+    Tcl_Size length;
     Tcl_ListObjLength(interp, specPtr, &length);
     if (length != 2) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid spec length", -1));
@@ -1118,7 +1118,7 @@ static int serialize_list(Tcl_Interp *interp, Tcl_Obj *listPtr, Tcl_DString *dsP
 }
 
 static int serialize_map(Tcl_Interp *interp, Tcl_Obj *dictPtr, Tcl_DString *dsPtr) {
-    Tcl_DStringAppend(dsPtr, LBRACE, 1);
+    Tcl_DStringAppend(dsPtr, LBRACE, -1);
     Tcl_DictSearch search;
     Tcl_Obj *key, *elemSpecPtr;
     int done;
@@ -1147,7 +1147,7 @@ static int serialize_map(Tcl_Interp *interp, Tcl_Obj *dictPtr, Tcl_DString *dsPt
 }
 
 static int serialize(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_DString *dsPtr) {
-    int length;
+    Tcl_Size length;
     Tcl_ListObjLength(interp, specPtr, &length);
     if (length != 2) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid spec", -1));
