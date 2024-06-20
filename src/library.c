@@ -472,7 +472,7 @@ static int tjson_CreateItemFromSpec(Tcl_Interp *interp, Tcl_Obj *specPtr, cJSON 
         case 'L':
             arr = cJSON_CreateArray();
             // iterate "valuePtr" as a list and add each item to the object "arr"
-            int listLength;
+            Tcl_Size listLength;
             Tcl_ListObjLength(interp, valuePtr, &listLength);
             for (int i = 0; i < listLength; i++) {
                 Tcl_Obj *elemSpecPtr;
@@ -1098,7 +1098,7 @@ static int serialize(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_DString *dsPtr);
 
 static int serialize_list(Tcl_Interp *interp, Tcl_Obj *listPtr, Tcl_DString *dsPtr) {
     Tcl_DStringAppend(dsPtr, LBRACKET, 1);
-    int listLength;
+    Tcl_Size listLength;
     Tcl_ListObjLength(interp, listPtr, &listLength);
     int first = 1;
     for (int i = 0; i < listLength; i++) {
