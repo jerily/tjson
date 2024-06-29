@@ -388,6 +388,7 @@ static int tjson_DestroyCmd(ClientData  clientData, Tcl_Interp *interp, int objc
     }
 
     tjson_UnregisterNode(handle);
+    // todo: if the node is root
     cJSON_Delete(root_structure);
 
     return TCL_OK;
@@ -625,6 +626,28 @@ static int tjson_GetObjectItemCmd(ClientData  clientData, Tcl_Interp *interp, in
     item->flags |= VISIBLE_IN_TCL;
 
     Tcl_SetObjResult(interp, Tcl_NewStringObj(item_handle, -1));
+    return TCL_OK;
+}
+
+static int tjson_HasObjectItemCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
+    DBG(fprintf(stderr, "HasObjectItemCmd\n"));
+    CheckArgs(3,3,1,"handle key");
+
+    const char *handle = Tcl_GetString(objv[1]);
+    cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
+
+    if (!cJSON_IsObject(root_structure)) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node is not an object", -1));
+        return TCL_ERROR;
+    }
+
+    cJSON_bool exists = cJSON_HasObjectItem(root_structure, Tcl_GetString(objv[2]));
+
+    Tcl_SetObjResult(interp, Tcl_NewBooleanObj(exists));
     return TCL_OK;
 }
 
@@ -1297,6 +1320,7 @@ int Tjson_Init(Tcl_Interp *interp) {
     Tcl_CreateObjCommand(interp, "::tjson::replace_item_in_object", tjson_ReplaceItemInObjectCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::delete_item_from_object", tjson_DeleteItemFromObjectCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::get_object_item", tjson_GetObjectItemCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::has_object_item", tjson_HasObjectItemCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::add_item_to_array", tjson_AddItemToArrayCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::insert_item_in_array", tjson_InsertItemInArrayCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::replace_item_in_array", tjson_ReplaceItemInArrayCmd, NULL, NULL);

@@ -11,6 +11,8 @@ puts json,after=[::tjson::to_json $node_handle]
 ::tjson::replace_item_in_object $node_handle f [list S "this is a test"]
 ::tjson::delete_item_from_object $node_handle c
 puts pretty_json,after,after=[::tjson::to_pretty_json $node_handle]
+puts has_object_item,c=[::tjson::has_object_item $node_handle c]
+puts has_object_item,d=[::tjson::has_object_item $node_handle d]
 set item_handle [::tjson::get_object_item $node_handle d]
 puts json,get_object_item,d=[::tjson::to_json $item_handle]
 ::tjson::destroy $node_handle
