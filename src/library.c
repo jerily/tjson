@@ -855,7 +855,7 @@ static int tjson_EscapeJsonString(Tcl_Obj *objPtr, Tcl_DString *dsPtr) {
     Tcl_Size length;
     const char *str = Tcl_GetStringFromObj(objPtr, &length);
     // loop through each character of the input string
-    for (int i = 0; i < length; i++) {
+    for (Tcl_Size i = 0; i < length; i++) {
         unsigned char c = str[i];
         switch (c) {
             case '"':
