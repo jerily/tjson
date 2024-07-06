@@ -444,7 +444,7 @@ static int tjson_CreateItemFromSpec(Tcl_Interp *interp, Tcl_Obj *specPtr, cJSON 
         case 'B':
             if (typeLength == 4 && 0 == strcmp("BOOL", type)) {
                 int flag;
-                Tcl_GetBooleanFromObj(NULL, specPtr, &flag);
+                Tcl_GetBooleanFromObj(NULL, valuePtr, &flag);
                 *item = cJSON_CreateBool(flag);
                 return TCL_OK;
             } else {
