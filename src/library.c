@@ -437,7 +437,6 @@ static int tjson_CreateItemFromSpec(Tcl_Interp *interp, Tcl_Obj *specPtr, cJSON 
             *item = cJSON_CreateString(Tcl_GetString(valuePtr));
             return TCL_OK;
         case 'N':
-            value_double;
             Tcl_GetDoubleFromObj(interp, valuePtr, &value_double);
             *item = cJSON_CreateNumber(value_double);
             return TCL_OK;
