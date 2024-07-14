@@ -818,6 +818,38 @@ static int tjson_GetArrayItemCmd(ClientData  clientData, Tcl_Interp *interp, int
     return TCL_OK;
 }
 
+static int tjson_GetStringCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
+    DBG(fprintf(stderr, "GetStringCmd\n"));
+    CheckArgs(2,2,1,"handle");
+
+    const char *handle = Tcl_GetString(objv[1]);
+    cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
+
+    Tcl_Obj *resultPtr = Tcl_NewStringObj(root_structure->string, -1);
+    Tcl_SetObjResult(interp, resultPtr);
+    return TCL_OK;
+}
+
+static int tjson_GetValueStringCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
+    DBG(fprintf(stderr, "GetValueStringCmd\n"));
+    CheckArgs(2,2,1,"handle");
+
+    const char *handle = Tcl_GetString(objv[1]);
+    cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
+
+    Tcl_Obj *resultPtr = Tcl_NewStringObj(root_structure->valuestring, -1);
+    Tcl_SetObjResult(interp, resultPtr);
+    return TCL_OK;
+}
+
 static int tjson_ToSimpleCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
     DBG(fprintf(stderr, "ToSimpleCmd\n"));
     CheckArgs(2,2,1,"handle");
@@ -1325,6 +1357,9 @@ int Tjson_Init(Tcl_Interp *interp) {
     Tcl_CreateObjCommand(interp, "::tjson::replace_item_in_array", tjson_ReplaceItemInArrayCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::delete_item_from_array", tjson_DeleteItemFromArrayCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::get_array_item", tjson_GetArrayItemCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::get_string", tjson_GetStringCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::get_valuestring", tjson_GetValueStringCmd, NULL, NULL);
+
     Tcl_CreateObjCommand(interp, "::tjson::to_simple", tjson_ToSimpleCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::to_typed", tjson_ToTypedCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::to_json", tjson_ToJsonCmd, NULL, NULL);
