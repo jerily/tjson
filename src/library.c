@@ -790,8 +790,8 @@ static int tjson_GetArrayItemCmd(ClientData  clientData, Tcl_Interp *interp, int
         return TCL_ERROR;
     }
 
-    if (!cJSON_IsArray(root_structure)) {
-        Tcl_SetObjResult(interp, Tcl_NewStringObj("node is not an array", -1));
+    if (!cJSON_IsArray(root_structure) && !cJSON_IsObject(root_structure)) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node is not an array or object", -1));
         return TCL_ERROR;
     }
 
