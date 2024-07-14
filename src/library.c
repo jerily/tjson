@@ -850,6 +850,72 @@ static int tjson_GetValueStringCmd(ClientData  clientData, Tcl_Interp *interp, i
     return TCL_OK;
 }
 
+
+static int tjson_IsNumberCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
+    DBG(fprintf(stderr, "IsNumberCmd\n"));
+    CheckArgs(2,2,1,"handle");
+
+    const char *handle = Tcl_GetString(objv[1]);
+    cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
+
+    Tcl_Obj *resultPtr = Tcl_NewBooleanObj(cJSON_IsNumber(root_structure));
+    Tcl_SetObjResult(interp, resultPtr);
+    return TCL_OK;
+}
+
+static int tjson_IsBoolCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
+    DBG(fprintf(stderr, "IsBoolCmd\n"));
+    CheckArgs(2,2,1,"handle");
+
+    const char *handle = Tcl_GetString(objv[1]);
+    cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
+
+    Tcl_Obj *resultPtr = Tcl_NewBooleanObj(cJSON_IsBool(root_structure));
+    Tcl_SetObjResult(interp, resultPtr);
+    return TCL_OK;
+}
+
+static int tjson_IsObjectCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
+    DBG(fprintf(stderr, "ToSimpleCmd\n"));
+    CheckArgs(2,2,1,"handle");
+
+    const char *handle = Tcl_GetString(objv[1]);
+    cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
+
+    Tcl_Obj *resultPtr = Tcl_NewBooleanObj(cJSON_IsObject(root_structure));
+    Tcl_SetObjResult(interp, resultPtr);
+    return TCL_OK;
+}
+
+static int tjson_IsArrayCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
+    DBG(fprintf(stderr, "IsArrayCmd\n"));
+    CheckArgs(2,2,1,"handle");
+
+    const char *handle = Tcl_GetString(objv[1]);
+    cJSON *root_structure = tjson_GetInternalFromNode(handle);
+    if (!root_structure) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
+        return TCL_ERROR;
+    }
+
+    Tcl_Obj *resultPtr = Tcl_NewBooleanObj(cJSON_IsArray(root_structure));
+    Tcl_SetObjResult(interp, resultPtr);
+    return TCL_OK;
+}
+
+
 static int tjson_ToSimpleCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
     DBG(fprintf(stderr, "ToSimpleCmd\n"));
     CheckArgs(2,2,1,"handle");
@@ -1359,6 +1425,10 @@ int Tjson_Init(Tcl_Interp *interp) {
     Tcl_CreateObjCommand(interp, "::tjson::get_array_item", tjson_GetArrayItemCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::get_string", tjson_GetStringCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::get_valuestring", tjson_GetValueStringCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::is_number", tjson_IsNumberCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::is_bool", tjson_IsBoolCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::is_object", tjson_IsObjectCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::is_array", tjson_IsArrayCmd, NULL, NULL);
 
     Tcl_CreateObjCommand(interp, "::tjson::to_simple", tjson_ToSimpleCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::to_typed", tjson_ToTypedCmd, NULL, NULL);
