@@ -95,6 +95,14 @@ make install
   - deletes an item at the given 0 based index and shifts all the existing items to the left
 * **::tjson::get_array_item** *handle* *index*
   - gets an item at the given 0 based index
+* **::tjson::is_number** *handle*
+  - returns true if node holds a number
+* **::tjson::is_bool** *handle*
+  - returns true if node holds a boolean value
+* **::tjson::is_string** *handle*
+  - returns true if node holds a string value
+* **::tjson::is_null** *handle*
+  - returns true if node holds a nullß
 * **::tjson::to_simple** *handle*
   - returns a simple TCL structure (e.g. list, dict, or string) for the given node
 * **::tjson::to_typed** *handle*
