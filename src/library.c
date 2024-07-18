@@ -1424,13 +1424,20 @@ void tjson_InitModule() {
     }
 }
 
+#if TCL_MAJOR_VERSION > 8
+#define MIN_VERSION "9.0"
+#else
+#define MIN_VERSION "8.6"
+#endif
+
+#define SetResult(str) Tcl_ResetResult(interp); \
+                     Tcl_SetStringObj(Tcl_GetObjResult(interp), (str), -1)
+
+
 int Tjson_Init(Tcl_Interp *interp) {
 
-    int major, minor, patchLevel, type;
-    Tcl_GetVersion(&major, &minor, &patchLevel, &type);
-
-    const char *version = major == 9 ? "9.0" : "8.6";
-    if (Tcl_InitStubs(interp, version, 0) == NULL) {
+    if (Tcl_InitStubs(interp, MIN_VERSION, 0) == NULL) {
+        SetResult("Unable to initialize Tcl stubs");
         return TCL_ERROR;
     }
 
