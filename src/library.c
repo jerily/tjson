@@ -35,6 +35,9 @@ typedef int Tcl_Size;
                      return TCL_ERROR; \
                  }
 
+#define SetResult(str) Tcl_ResetResult(interp); \
+                     Tcl_SetStringObj(Tcl_GetObjResult(interp), (str), -1)
+
 #define CMD_NAME(s, internal) sprintf((s), "_TJSON_%p", (internal))
 
 #define SP " "
@@ -315,8 +318,9 @@ char *tjson_VarTraceProc(ClientData clientData, Tcl_Interp *interp, const char *
     }
     if (flags & TCL_TRACE_UNSETS) {
         DBG(fprintf(stderr, "VarTraceProc: TCL_TRACE_UNSETS\n"));
-        tjson_UnregisterNode(trace->handle);
-        cJSON_Delete(trace->item);
+        if (tjson_UnregisterNode(trace->handle)) {
+            cJSON_Delete(trace->item);
+        }
         Tcl_Free((char *) trace->varname);
         Tcl_Free((char *) trace->handle);
         Tcl_Free((char *) trace);
@@ -381,15 +385,20 @@ static int tjson_DestroyCmd(ClientData  clientData, Tcl_Interp *interp, int objc
     CheckArgs(2,2,1,"handle");
 
     const char *handle = Tcl_GetString(objv[1]);
-    cJSON *root_structure = tjson_GetInternalFromNode(handle);
-    if (!root_structure) {
+    cJSON *item = tjson_GetInternalFromNode(handle);
+    if (!item) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("node not found", -1));
         return TCL_ERROR;
     }
 
     tjson_UnregisterNode(handle);
     // todo: if the node is root
-    cJSON_Delete(root_structure);
+    if (item->prev == NULL && item->next == NULL) {
+        cJSON_Delete(item);
+    } else {
+        SetResult("node is not a root");
+        return TCL_ERROR;
+    }
 
     return TCL_OK;
 }
@@ -1429,10 +1438,6 @@ void tjson_InitModule() {
 #else
 #define MIN_VERSION "8.6"
 #endif
-
-#define SetResult(str) Tcl_ResetResult(interp); \
-                     Tcl_SetStringObj(Tcl_GetObjResult(interp), (str), -1)
-
 
 int Tjson_Init(Tcl_Interp *interp) {
 
