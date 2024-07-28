@@ -429,7 +429,11 @@ static int tjson_CreateItemFromSpec(Tcl_Interp *interp, Tcl_Obj *specPtr, cJSON 
     Tcl_Size length;
     Tcl_ListObjLength(interp, specPtr, &length);
     if (length != 2) {
-        Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid spec length", -1));
+        Tcl_Obj *resultPtr = Tcl_NewStringObj("invalid spec length: ", -1);
+        Tcl_AppendObjToObj(resultPtr, specPtr);
+        Tcl_SetObjResult(interp, resultPtr);
+        Tcl_IncrRefCount(resultPtr);
+        Tcl_DecrRefCount(resultPtr);
         return TCL_ERROR;
     }
     Tcl_Obj *typePtr, *valuePtr;
