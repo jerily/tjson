@@ -39,9 +39,9 @@ The following works for Linux and MacOS. For windows, see the [Windows Build Ins
 For TCL:
 ```bash
 # Build the TCL extension
-wget https://github.com/jerily/tjson/archive/refs/tags/v1.0.21.tar.gz
-tar -xzf v1.0.21.tar.gz
-export TJSON_DIR=$(pwd)/tjson-1.0.21
+wget https://github.com/jerily/tjson/archive/refs/tags/v1.0.23.tar.gz
+tar -xzf v1.0.23.tar.gz
+export TJSON_DIR=$(pwd)/tjson-1.0.23
 cd ${TJSON_DIR}
 mkdir build
 cd build
