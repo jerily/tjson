@@ -1431,7 +1431,7 @@ void tjson_InitModule() {
         Tcl_MutexLock(&tjson_NodeToInternal_HT_Mutex);
         Tcl_InitHashTable(&tjson_NodeToInternal_HT, TCL_STRING_KEYS);
         Tcl_MutexUnlock(&tjson_NodeToInternal_HT_Mutex);
-        Tcl_CreateThreadExitHandler(tjson_ExitHandler, NULL);
+        Tcl_CreateExitHandler(tjson_ExitHandler, NULL);
         tjson_ModuleInitialized = 1;
         DBG(fprintf(stderr, "tjson module initialized\n"));
     }
