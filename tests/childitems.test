@@ -1,0 +1,69 @@
+package require tcltest
+package require tjson
+
+namespace import -force ::tcltest::test
+
+::tcltest::configure {*}$argv
+
+proc setup {} {
+    global node_handle
+    set node_handle [::tjson::parse {
+    { "store": {
+        "book": [
+            { "category": "reference", "author": "Nigel Rees",
+            "title": "Sayings of the Century", "price": "8.95"  },
+            { "category": "fiction", "author": "Evelyn Waugh",
+            "title": "Sword of Honour", "price": "12.99" },
+            { "category": "fiction", "author": "Herman Melville",
+            "title": "Moby Dick", "isbn": "0-553-21311-3",
+            "price": "8.99" },
+            { "category": "fiction", "author": "J. R. R. Tolkien",
+            "title": "The Lord of the Rings", "isbn": "0-395-19395-8",
+            "price": "22.99" }
+        ],
+        "bicycle": { "color": "red", "price": "19.95" }
+    }}}]
+}
+
+proc cleanup {} {
+    global node_handle
+    ::tjson::destroy $node_handle
+}
+
+test array-child-items-1 {get child items of an array} -setup setup -cleanup cleanup -body {
+    global node_handle
+
+    set store_handle [::tjson::get_object_item $node_handle store]
+    set book_handle [::tjson::get_object_item $store_handle book]
+
+    set books_typed [list]
+    foreach item_handle [::tjson::get_child_items $book_handle] {
+        lappend books_typed [::tjson::to_typed $item_handle]
+    }
+
+    set actual [list L $books_typed]
+    set expected [::tjson::to_typed $book_handle]
+
+    string compare $actual $expected
+} -result 0
+
+test object-child-items-1 {get child items of an object} -setup setup -cleanup cleanup -body {
+    global node_handle
+
+    set store_handle [::tjson::get_object_item $node_handle store]
+    set book_handle [::tjson::get_object_item $store_handle book]
+
+    set books_typed [list]
+    foreach item_handle [::tjson::get_child_items $book_handle] {
+        set book_typed [list]
+        foreach child_handle [::tjson::get_child_items $item_handle] {
+            lappend book_typed [::tjson::get_string $child_handle] [::tjson::to_typed $child_handle]
+        }
+        lappend books_typed [list M $book_typed]
+    }
+
+    set actual [list L $books_typed]
+    set expected [::tjson::to_typed $book_handle]
+
+    string compare $actual $expected
+} -result 0
