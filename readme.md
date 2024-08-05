@@ -95,6 +95,8 @@ make install
   - deletes an item at the given 0 based index and shifts all the existing items to the left
 * **::tjson::get_array_item** *handle* *index*
   - gets an item at the given 0 based index
+* **::tjson::get_child_items** *handle*
+  - gets all the child items of an object or array 
 * **::tjson::is_number** *handle*
   - returns true if node holds a number
 * **::tjson::is_bool** *handle*
