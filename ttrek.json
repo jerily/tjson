@@ -1,0 +1,47 @@
+{
+  "name": "tjson",
+  "version": "1.0.25",
+  "scripts": {
+
+  },
+  "dependencies": {
+    "tcl": "^9.0.0-beta.2"
+  },
+  "devDependencies": {
+
+  },
+  "build": {
+    "default": [
+      {
+        "cmd": "download",
+        "url": "https://github.com/jerily/tjson/archive/refs/tags/v1.0.25.tar.gz"
+      },
+      {
+        "cmd": "unpack"
+      },
+      {
+        "cmd": "cd"
+      },
+      {
+        "cmd": "cmake_config",
+        "options": [
+          {
+            "name": "TCL_LIBRARY_DIR",
+            "value": "$INSTALL_DIR/lib"
+          },
+          {
+            "name": "TCL_INCLUDE_DIR",
+            "value": "$INSTALL_DIR/include"
+          }
+        ]
+      },
+      {
+        "cmd": "make",
+        "parallel": true
+      },
+      {
+        "cmd": "make_install"
+      }
+    ]
+  }
+}
