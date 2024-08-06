@@ -5,3 +5,6 @@ models
 *.o
 *.so
 .vs
+
+/ttrek-lock.json
+/ttrek-venv
