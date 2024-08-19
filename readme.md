@@ -97,6 +97,10 @@ make install
   - gets an item at the given 0 based index
 * **::tjson::get_child_items** *handle*
   - gets all the child items of an object or array 
+* **::tjson::get_string** *handle*
+    - returns the string key of the node
+* **::tjson::get_valuestring** *handle*
+    - returns the string value of the node
 * **::tjson::is_number** *handle*
   - returns true if node holds a number
 * **::tjson::is_bool** *handle*
