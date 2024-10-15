@@ -97,7 +97,7 @@ void jsonpath_free_list(jsonpath_node_t *node) {
     jsonpath_node_t *curr = node;
     while (curr != NULL) {
         jsonpath_node_t *next = curr->next;
-        Tcl_Free(curr);
+        Tcl_Free((char *) curr);
         curr = next;
     }
 }
@@ -297,14 +297,14 @@ static int jsonpath_parse(Tcl_Interp *interp, const char *jsonpath, int length, 
                             }
                             indices[indices_length++] = strtoll(p, (char **) &p, 10);
                             if (p[0] != ',' && p[0] != ']') {
-                                Tcl_Free(indices);
+                                Tcl_Free((char *) indices);
                                 jsonpath_free_list(*nodes);
                                 Tcl_SetObjResult(interp, Tcl_NewStringObj("Invalid JSONPath: ',' or ']' expected", -1));
                                 return TCL_ERROR;
                             }
                             if (indices_length == k) {
                                 k *= 2;
-                                indices = Tcl_Realloc(indices, sizeof(int) * k);
+                                indices = (int *) Tcl_Realloc((char *) indices, sizeof(int) * k);
                             }
                         }
                         jsonpath_node_t *node = jsonpath_node_new(INDICES_SET);
