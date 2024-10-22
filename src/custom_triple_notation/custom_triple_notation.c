@@ -3,6 +3,7 @@
 #include "custom_triple_notation.h"
 
 #ifndef TCL_SIZE_MAX
+#undef Tcl_Size
 typedef int Tcl_Size;
 # define Tcl_GetSizeIntFromObj Tcl_GetIntFromObj
 # define Tcl_NewSizeIntObj Tcl_NewIntObj

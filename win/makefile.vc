@@ -1,0 +1,91 @@
+#------------------------------------------------------------- -*- makefile -*-
+#
+# Makefile for tjson
+#
+# Basic build, test and install (assuming Tcl installed in c:/tcl)
+#   nmake /f makefile.vc INSTALLDIR=c:\tcl
+#   nmake /f makefile.vc INSTALLDIR=c:\tcl test
+#   nmake /f makefile.vc INSTALLDIR=c:\tcl install
+#
+# For other build options (debug, static etc.),
+# See TIP 477 (https://core.tcl.tk/tips/doc/trunk/tip/477.md) for
+# detailed documentation.
+# 
+# See the file "LICENSE" for information on usage and redistribution
+# of this file, and for a DISCLAIMER OF ALL WARRANTIES.
+#
+PROJECT = tjson
+GENERICDIR = ..\src
+
+!if [echo DOTVERSION = \> versions.vc] \
+   || [.\nmakehlp -V ..\CMakeLists.txt tjson >> versions.vc]
+!error *** Could not figure out extension version. Please define DOTVERSION in parent makefile before including rules.vc.
+!endif
+
+!include versions.vc
+
+!include "rules-ext.vc"
+
+CJSONDIR = $(GENERICDIR)\cJSON
+JSONPATHDIR = $(GENERICDIR)\jsonpath
+CUSTOMNOTATIONDIR = $(GENERICDIR)\custom_triple_notation
+
+PRJ_OBJS = \
+	$(TMP_DIR)\library.obj  \
+	$(TMP_DIR)\cJSON.obj  \
+	$(TMP_DIR)\jsonpath.obj  \
+	$(TMP_DIR)\custom_triple_notation.obj
+
+PRJ_DEFINES = -D_CRT_SECURE_NO_WARNINGS -DTCL_NO_DEPRECATED -DVERSION=$(DOTVERSION)
+
+# We do not use the standard predefined install targets because we want
+# to load binaries from platform-specific subdirectories of the package
+# directory.
+DISABLE_TARGET_install = 1
+!include "$(_RULESDIR)\targets.vc"
+
+# Override binary installation directory
+!if "$(ARCH)" == "AMD64"
+BIN_INSTALL_DIR = $(SCRIPT_INSTALL_DIR)\win32-x86_64
+!else
+BIN_INSTALL_DIR = $(SCRIPT_INSTALL_DIR)\win32-ix86
+!endif
+
+install: pkgindex
+	@echo Installing to '$(SCRIPT_INSTALL_DIR)'
+	@if not exist "$(SCRIPT_INSTALL_DIR)" mkdir "$(SCRIPT_INSTALL_DIR)"
+	@if not exist "$(BIN_INSTALL_DIR)" mkdir "$(BIN_INSTALL_DIR)"
+	@$(CPY) $(PRJLIB) "$(BIN_INSTALL_DIR)" >NUL
+	@$(CPY) $(LIBDIR)\*.tcl "$(SCRIPT_INSTALL_DIR)"
+	@$(CPY) $(OUT_DIR)\pkgIndex.tcl "$(SCRIPT_INSTALL_DIR)"
+	@$(CPY) $(ROOT)\README.md "$(SCRIPT_INSTALL_DIR)"
+	@$(CPY) $(ROOT)\LICENSE "$(SCRIPT_INSTALL_DIR)"
+
+pkgindex:
+	@echo package ifneeded $(PROJECT) $(DOTVERSION) [list load [file join ^$dir $(PRJLIBNAME)]] > $(OUT_DIR)\pkgIndex.tcl
+
+xpkgindex:
+	@nmakehlp -s << $(ROOT)\pkgIndex.tcl.in > $(OUT_DIR)\pkgIndex.tcl
+@PROJECT_VERSION@    $(DOTVERSION)
+@PACKAGE_NAME@       $(PRJ_PACKAGE_TCLNAME)
+@PACKAGE_TCLNAME@    $(PRJ_PACKAGE_TCLNAME)
+@PKG_LIB_FILE@       $(PRJLIBNAME)
+libtjson             $(PRJLIBNAME)
+@PKG_LIB_FILE8@      $(PRJLIBNAME8)
+@PKG_LIB_FILE9@      $(PRJLIBNAME9)
+<<
+
+{$(CJSONDIR)}.c{$(TMP_DIR)}.obj::
+        $(cc32) $(pkgcflags) -Fo$(TMP_DIR)\ @<<
+$<
+<<
+
+{$(JSONPATHDIR)}.c{$(TMP_DIR)}.obj::
+        $(cc32) $(pkgcflags) -Fo$(TMP_DIR)\ @<<
+$<
+<<
+
+{$(CUSTOMNOTATIONDIR)}.c{$(TMP_DIR)}.obj::
+        $(cc32) $(pkgcflags) -Fo$(TMP_DIR)\ @<<
+$<
+<<
