@@ -18,6 +18,10 @@
 extern "C" {
 #endif
 
+#ifdef BUILD_tjson
+# undef TCL_STORAGE_CLASS
+# define TCL_STORAGE_CLASS DLLEXPORT
+#endif
 EXTERN int Tjson_Init(Tcl_Interp *interp);
 #ifdef USE_NAVISERVER
 NS_EXTERN int Ns_ModuleVersion = 1;
