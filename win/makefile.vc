@@ -17,8 +17,15 @@
 PROJECT = tjson
 GENERICDIR = ..\src
 
+# Need nmakehlp to extract version number from cmake makefile.
+!if !EXISTS(nmakehlp.exe)
+!if [cl nmakehlp.c]
+!error *** Could not build nmakehlp.
+!endif
+!endif
+
 !if [echo DOTVERSION = \> versions.vc] \
-   || [.\nmakehlp -V ..\CMakeLists.txt tjson >> versions.vc]
+   || [nmakehlp -V ..\CMakeLists.txt tjson >> versions.vc]
 !error *** Could not figure out extension version. Please define DOTVERSION in parent makefile before including rules.vc.
 !endif
 
@@ -43,13 +50,6 @@ PRJ_DEFINES = -D_CRT_SECURE_NO_WARNINGS -DTCL_NO_DEPRECATED -DVERSION=$(DOTVERSI
 # directory.
 DISABLE_TARGET_install = 1
 !include "$(_RULESDIR)\targets.vc"
-
-# Override binary installation directory
-!if "$(ARCH)" == "AMD64"
-BIN_INSTALL_DIR = $(SCRIPT_INSTALL_DIR)\win32-x86_64
-!else
-BIN_INSTALL_DIR = $(SCRIPT_INSTALL_DIR)\win32-ix86
-!endif
 
 install: pkgindex
 	@echo Installing to '$(SCRIPT_INSTALL_DIR)'
