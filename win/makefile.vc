@@ -17,8 +17,15 @@
 PROJECT = tjson
 GENERICDIR = ..\src
 
+# Need nmakehlp to extract version number from cmake makefile.
+!if !EXISTS(nmakehlp.exe)
+!if [cl nmakehlp.c]
+!error *** Could not build nmakehlp.
+!endif
+!endif
+
 !if [echo DOTVERSION = \> versions.vc] \
-   || [.\nmakehlp -V ..\CMakeLists.txt tjson >> versions.vc]
+   || [nmakehlp -V ..\CMakeLists.txt tjson >> versions.vc]
 !error *** Could not figure out extension version. Please define DOTVERSION in parent makefile before including rules.vc.
 !endif
 
