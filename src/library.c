@@ -260,6 +260,57 @@ static Tcl_Obj *tjson_TreeToTyped(Tcl_Interp *interp, cJSON *item) {
     }
 }
 
+#define TJSON_EXCERPT_CHARS 20
+
+// Raise "invalid json at line L, column C: ..." for a parse that stopped at
+// stopped, quoting up to TJSON_EXCERPT_CHARS characters from there.
+static int tjson_InvalidJson(Tcl_Interp *interp, const char *json, Tcl_Size length, const char *stopped) {
+    const char *json_end = json + length;
+    if (stopped == NULL || stopped < json || stopped > json_end) {
+        stopped = json_end;
+    }
+
+    Tcl_Size line = 1;
+    const char *line_start = json;
+    for (const char *p = json; p < stopped; p++) {
+        if (*p == '\n') {
+            line++;
+            line_start = p + 1;
+        }
+    }
+    Tcl_Size column = Tcl_NumUtfChars(line_start, stopped - line_start) + 1;
+
+    Tcl_Obj *resultPtr = Tcl_ObjPrintf(
+        "invalid json at line %" TCL_SIZE_MODIFIER "d, column %" TCL_SIZE_MODIFIER "d: ",
+        line, column);
+    if (stopped == json_end) {
+        Tcl_AppendToObj(resultPtr, "unexpected end of input", -1);
+    } else {
+        const char *excerpt_end = stopped;
+        int chars = 0;
+        while (chars < TJSON_EXCERPT_CHARS && excerpt_end < json_end && *excerpt_end != '\n') {
+            // Tcl 8.6 holds a character outside the BMP as a surrogate pair; keep the
+            // two halves together. Tcl 9 never yields a surrogate here.
+            Tcl_UniChar ch = 0;
+            const char *next = excerpt_end + Tcl_UtfToUniChar(excerpt_end, &ch);
+            if (ch >= 0xD800 && ch <= 0xDBFF && next < json_end) {
+                next += Tcl_UtfToUniChar(next, &ch);
+            }
+            excerpt_end = next;
+            chars++;
+        }
+        if (excerpt_end > json_end) {
+            excerpt_end = json_end;
+        }
+        int truncated = excerpt_end < json_end && *excerpt_end != '\n';
+        Tcl_AppendToObj(resultPtr, "\"", 1);
+        Tcl_AppendToObj(resultPtr, stopped, excerpt_end - stopped);
+        Tcl_AppendToObj(resultPtr, truncated ? "...\"" : "\"", -1);
+    }
+    Tcl_SetObjResult(interp, resultPtr);
+    return TCL_ERROR;
+}
+
 static int tjson_JsonToTypedCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
     DBG(fprintf(stderr, "JsonToTypedCmd\n"));
     CheckArgs(2,2,1,"json");
@@ -268,14 +319,14 @@ static int tjson_JsonToTypedCmd(ClientData  clientData, Tcl_Interp *interp, int 
     const char *json = Tcl_GetStringFromObj(objv[1], &length);
 
     if (length > 0) {
-        cJSON *root_structure = cJSON_ParseWithLength(json, length);
+        const char *stopped = NULL;
+        cJSON *root_structure = cJSON_ParseWithLengthOpts(json, length + 1, &stopped, 1);
         if (root_structure) {
             Tcl_Obj *resultPtr = tjson_TreeToTyped(interp, root_structure);
             cJSON_Delete(root_structure);
             Tcl_SetObjResult(interp, resultPtr);
         } else {
-            Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid json", -1));
-            return TCL_ERROR;
+            return tjson_InvalidJson(interp, json, length, stopped);
         }
     }
 
@@ -290,14 +341,14 @@ static int tjson_JsonToSimpleCmd(ClientData  clientData, Tcl_Interp *interp, int
     const char *json = Tcl_GetStringFromObj(objv[1], &length);
 
     if (length > 0) {
-        cJSON *root_structure = cJSON_ParseWithLength(json, length);
+        const char *stopped = NULL;
+        cJSON *root_structure = cJSON_ParseWithLengthOpts(json, length + 1, &stopped, 1);
         if (root_structure) {
             Tcl_Obj *resultPtr = tjson_TreeToSimple(interp, root_structure);
             cJSON_Delete(root_structure);
             Tcl_SetObjResult(interp, resultPtr);
         } else {
-            Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid json", -1));
-            return TCL_ERROR;
+            return tjson_InvalidJson(interp, json, length, stopped);
         }
     }
     return TCL_OK;
@@ -358,10 +409,10 @@ static int tjson_ParseCmd(ClientData  clientData, Tcl_Interp *interp, int objc, 
         Tcl_SetObjResult(interp, Tcl_NewStringObj("empty json", -1));
         return TCL_ERROR;
     }
-    cJSON *root_structure = cJSON_ParseWithLength(json, length);
+    const char *stopped = NULL;
+    cJSON *root_structure = cJSON_ParseWithLengthOpts(json, length + 1, &stopped, 1);
     if (!root_structure) {
-        Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid json", -1));
-        return TCL_ERROR;
+        return tjson_InvalidJson(interp, json, length, stopped);
     }
 
     char handle[80];
