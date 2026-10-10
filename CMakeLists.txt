@@ -15,12 +15,18 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 find_package(TCL 8.6.13 REQUIRED)  # TCL_INCLUDE_PATH TCL_LIBRARY
+find_package(TclStub REQUIRED)     # TCL_STUB_LIBRARY
+find_package(Threads REQUIRED)
+if(NOT TCL_STUB_LIBRARY)
+    message(FATAL_ERROR "Tcl stub library not found; set TCL_STUB_LIBRARY")
+endif()
 
 message(STATUS "TCL_INCLUDE_PATH: ${TCL_INCLUDE_PATH}")
-message(STATUS "TCL_LIBRARY: ${TCL_LIBRARY}")
+message(STATUS "TCL_STUB_LIBRARY: ${TCL_STUB_LIBRARY}")
 
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_C_FLAGS  "-DTCL_THREADS -DVERSION=${PROJECT_VERSION} ${CMAKE_C_FLAGS}")
+add_compile_definitions(USE_TCL_STUBS BUILD_tjson)
 
 enable_testing()
 add_test(NAME AllUnitTests COMMAND tclsh8.6 ${CMAKE_CURRENT_SOURCE_DIR}/tests/all.tcl)
@@ -29,7 +35,7 @@ add_library(tjson SHARED src/library.c src/cJSON/cJSON.c src/jsonpath/jsonpath.c
 set_target_properties(tjson PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 include_directories(${TCL_INCLUDE_PATH})
-target_link_libraries(tjson PRIVATE ${TCL_LIBRARY})
+target_link_libraries(tjson PRIVATE Threads::Threads ${TCL_STUB_LIBRARY})
 get_filename_component(TCL_LIBRARY_PATH "${TCL_LIBRARY}" PATH)
 
 install(TARGETS ${TARGET}
