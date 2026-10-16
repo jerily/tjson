@@ -44,8 +44,7 @@ cd build
 cmake .. \
   -A Win32 \
   -DTCL_LIBRARY_DIR="C:/Tcl/lib" \
-  -DTCL_INCLUDE_DIR="C:/Tcl/include" \
-  -DTCL_LIBRARY="C:/Tcl/lib/tcl86t.lib"
+  -DTCL_INCLUDE_DIR="C:/Tcl/include"
 cmake --build . --config=Release
 cmake --install . --config=Release
 ```
