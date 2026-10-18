@@ -19,8 +19,9 @@ get_filename_component(TCL_INCLUDE_PATH_PARENT "${TCL_INCLUDE_PATH}" DIRECTORY)
 
 # Tcl 9 names its stub library tclstub; Tcl 8.6 adds the version.
 find_library(TCL_STUB_LIBRARY
-  NAMES tclstub tclstub8.6 tclstub86
+  NAMES tclstub tclstub8.6 tclstub86 tclstub9.0 tclstub90
   HINTS ${TCL_LIBRARY_DIR} "${TCL_INCLUDE_PATH_PARENT}/lib"
+  PATH_SUFFIXES tcl9.0
 )
 
 if(EXISTS "${TCL_INCLUDE_PATH}/tcl.h")
