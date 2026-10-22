@@ -1337,6 +1337,10 @@ static int tjson_QueryCmd(ClientData  clientData, Tcl_Interp *interp, int objc, 
     result.k = 16;
     result.items_length = 0;
     result.items = (cJSON **)malloc(sizeof(cJSON *) * result.k);
+    if (result.items == NULL) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("failed to allocate JSONPath result", -1));
+        return TCL_ERROR;
+    }
     if (TCL_OK != jsonpath_match(interp, jsonpath, length, root_structure, &result)) {
         free(result.items);
         return TCL_ERROR;

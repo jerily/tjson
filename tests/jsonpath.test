@@ -147,6 +147,15 @@ test jsonpath-wildcard-index-empty-results {} -setup setup -cleanup cleanup -bod
     lmap x $item_handles {::tjson::to_simple $x}
 } -result {}
 
+test jsonpath-wildcard-index-grows-result-buffer {wildcard returns more than initial capacity} -body {
+    set large_handle [::tjson::parse {[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}]
+    try {
+        llength [::tjson::query $large_handle {$[*]}]
+    } finally {
+        ::tjson::destroy $large_handle
+    }
+} -result 17
+
 test jsonpath-invalid-syntax-1 {} -setup setup -cleanup cleanup -body {
     global handle
     set jsonpath {$['store'].book[*.title}
