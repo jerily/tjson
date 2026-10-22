@@ -1,4 +1,6 @@
 #include <ctype.h>
+#include <limits.h>
+#include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
 #include "jsonpath.h"
@@ -362,14 +364,25 @@ static int jsonpath_parse(Tcl_Interp *interp, const char *jsonpath, int length, 
 }
 
 static int add_item_to_result(jsonpath_result_t *result, cJSON *item) {
-    result->items[result->items_length++] = item;
-    if (result->items_length > result->k) {
-        result->k *= 2;
-        result->items = (cJSON **) Tcl_Realloc((char *)result->items, sizeof(cJSON *) * result->k);
-        if (result->items == NULL) {
+    if (result->items_length >= result->k) {
+        if (result->k <= 0 || result->k > INT_MAX / 2) {
             return TCL_ERROR;
         }
+
+        int new_k = result->k * 2;
+        if ((size_t)new_k > SIZE_MAX / sizeof(*result->items)) {
+            return TCL_ERROR;
+        }
+
+        cJSON **new_items = (cJSON **)realloc(result->items,
+                                               sizeof(*result->items) * (size_t)new_k);
+        if (new_items == NULL) {
+            return TCL_ERROR;
+        }
+        result->items = new_items;
+        result->k = new_k;
     }
+    result->items[result->items_length++] = item;
     return TCL_OK;
 }
 

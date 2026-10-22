@@ -149,11 +149,11 @@ make install
 | [:end]              | Selects array elements from the first element up to, but not including, the end index. |
 | [-n:]               | Selects the last *n* elements in the array. |
 
+## Security
 
+Please see [security.md](security.md) for instructions on reporting vulnerabilities privately.
 
+## Acknowledgements
 
-
-
-
-
-
+- [Oz Kaizer (@tatikoma)](https://github.com/tatikoma) for reporting the JSONPath heap buffer overflow and providing a reproducer, patch, and regression test.
+- [@mtmcp](https://github.com/mtmcp) for the pull request improving Tcl stub library linking and discovery, static builds, and initialization error handling.
