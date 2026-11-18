@@ -311,6 +311,8 @@ static int tjson_InvalidJson(Tcl_Interp *interp, const char *json, Tcl_Size leng
     return TCL_ERROR;
 }
 
+#include "strict_json.h"
+
 static int tjson_JsonToTypedCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
     DBG(fprintf(stderr, "JsonToTypedCmd\n"));
     CheckArgs(2,2,1,"json");
@@ -1553,6 +1555,7 @@ int Tjson_Init(Tcl_Interp *interp) {
 
     Tcl_CreateNamespace(interp, "::tjson", NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::json_to_typed", tjson_JsonToTypedCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::json_to_typed_strict", tjson_StrictCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::json_to_simple", tjson_JsonToSimpleCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::typed_to_json", tjson_TypedToJsonCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::escape_json_string", tjson_EscapeJsonStringCmd, NULL, NULL);

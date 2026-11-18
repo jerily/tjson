@@ -1,5 +1,16 @@
 # tjson
 
+## Strict JSON (1.0.28)
+
+`::tjson::json_to_typed_strict json ?maximumDepth=32?` returns a typed Tcl value,
+preserving null as `{N null}`. It rejects duplicate object keys (including escaped
+aliases), malformed numbers, trailing data, invalid UTF-8/surrogates, NUL, and
+non-finite numbers. Input is limited to 1 MiB; depth is configurable from 1 to 128.
+Numbers longer than 63 characters are rejected to match the underlying parser's
+numeric buffer. Errors have code `{TJSON STRICT}` and do not quote input values.
+Existing permissive parsing commands retain their behavior. Use the strict
+command for security-sensitive protocol documents and JWT preflight parsing.
+
 TCL/C extension for parsing, manipulating, and querying JSON.
 
 ## Examples
