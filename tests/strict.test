@@ -1,0 +1,23 @@
+package require tcltest
+package require tjson 1.0.28
+namespace import ::tcltest::test
+test strict-types {strict parsing preserves null, booleans and arrays} -body {
+    ::tjson::json_to_typed_strict {{"ok":true,"n":null,"a":["x",2]}}
+} -result {M {ok {BOOL 1} n {N null} a {L {{S x} {N 2}}}}}
+test strict-rejections {ambiguous and non-JSON documents fail without input excerpts} -body {
+    set result {}
+    foreach json [list {{"a":1,"a":2}} {{"a":1,"\u0061":2}} {{"nested":{"x":1,"x":2}}} \
+        {{"alg":"RS256\u0000none"}} {{"a":"\ud800"}} {{"a":01}} {{"a":1.}} {{"a":+1}} \
+        {{"a":1e999}} {{"a":false,}} {{} trailing} [format {"line%sfeed"} \n] {}] {
+        lappend result [catch {::tjson::json_to_typed_strict $json} message]
+        if {[string first "RS256" $message] >= 0} {error "parser disclosed input"}
+    }
+    lsort -unique $result
+} -result 1
+test strict-depth {limits are enforced before tree allocation} -body {
+    list [catch {::tjson::json_to_typed_strict {[[[1]]]} 1}] \
+        [::tjson::json_to_typed_strict {[[1]]} 2]
+} -result {1 {L {{L {{N 1}}}}}}
+test strict-unicode {valid escaped and literal UTF-8 remain valid} -body {
+    ::tjson::json_to_typed_strict {{"name":"Καλημέρα","emoji":"\ud83d\ude00"}}
+} -result [list M [dict create name {S Καλημέρα} emoji [list S \U0001f600]]]
