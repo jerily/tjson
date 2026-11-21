@@ -36,3 +36,15 @@ test typed_to_json-2 {convert typed spec of different types to json} {
 test json_to_typed-5 {invalid json raises an error instead of crashing} -body {
     ::tjson::json_to_typed {John Doe}
 } -returnCodes error -match glob -result {invalid json*}
+
+test typed_to_simple-1 {convert typed containers and scalar values directly} -body {
+    ::tjson::typed_to_simple {M {values {L {{N null} {S null} {BOOL yes} {N 2.5} {M {}} {L {}}}}}}
+} -result {values {{} null 1 2.5 {} {}}}
+
+test typed_to_simple-2 {malformed nested pairs and values raise errors} -body {
+    set errors {}
+    foreach spec {{S} {STRING x} {N nope} {BOOL maybe} {M odd} {L {{S ok} bad}} {M {a {BAD 0}}}} {
+        lappend errors [catch {::tjson::typed_to_simple $spec}]
+    }
+    lsort -unique $errors
+} -result 1

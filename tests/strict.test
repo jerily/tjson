@@ -20,4 +20,4 @@ test strict-depth {limits are enforced before tree allocation} -body {
 } -result {1 {L {{L {{N 1}}}}}}
 test strict-unicode {valid escaped and literal UTF-8 remain valid} -body {
     ::tjson::json_to_typed_strict {{"name":"Καλημέρα","emoji":"\ud83d\ude00"}}
-} -result [list M [dict create name {S Καλημέρα} emoji [list S \U0001f600]]]
+} -result [list M [dict create name {S Καλημέρα} emoji [list S [encoding convertfrom utf-8 [binary decode hex f09f9880]]]]]

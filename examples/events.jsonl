@@ -1,0 +1,3 @@
+{"event":"signup","user":42}
+{"event":"login","user":17}
+{"event":"logout","user":17}

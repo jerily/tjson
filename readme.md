@@ -1,5 +1,44 @@
 # tjson
 
+## JSON Lines (1.0.29)
+
+`::tjson::jsonl_gets ?-simple|-handle? channel varName` reads one JSON value from a blocking
+channel into `varName`. It returns 1 for a record (including
+`null`) and 0 at EOF. A blank, malformed, or oversized line raises
+`{TJSON STRICT}`. The reader consumes that line and leaves the variable
+untouched, as it does at EOF. It accepts LF, CRLF, and a final record without a newline.
+
+| Read mode | Value assigned to `varName` | Example using [events.jsonl](examples/events.jsonl) |
+| --- | --- | --- |
+| Default | Typed Tcl value, suitable for `jsonl_puts`. JSON null is `{N null}`. | [Convert a typed record with typed_to_simple](examples/example9-jsonl.tcl) |
+| `-simple` | Tcl dictionary, list, or scalar. Both JSON null and an empty string become an empty Tcl string. | [Read fields with dict get](examples/example10-jsonl-simple.tcl) |
+| `-handle` | An independently owned root handle for querying or modifying the parsed record. | [Query each record with JSONPath](examples/example11-jsonl-handle.tcl) |
+
+With `-handle`, call `::tjson::destroy $root` for each root, typically in a
+`finally` block inside the loop. Reading another record or unsetting the
+variable leaves the previous root alive. Destroying the root also invalidates
+its child handles.
+
+`::tjson::jsonl_puts channel typedValue` writes one compact JSON value and a
+newline and returns the empty string. Both commands use UTF-8 bytes and the
+strict JSON limits below, including a 1 MiB payload and default depth of 32.
+Use binary translation for exact on-disk framing. The caller owns the channel
+and controls flushing and closing.
+
+Run any example from the repository root, for instance
+`tclsh examples/example10-jsonl-simple.tcl`.
+
+```tcl
+set ch [open events.jsonl rb]
+try {
+    while {[::tjson::jsonl_gets $ch event]} {
+        ::tjson::jsonl_puts stdout $event
+    }
+} finally {
+    close $ch
+}
+```
+
 ## Strict JSON (1.0.28)
 
 `::tjson::json_to_typed_strict json ?maximumDepth=32?` returns a typed Tcl value,
@@ -78,6 +117,8 @@ make install
     - returns a simple TCL structure (e.g. list, dict, or string)
 * **::tjson::json_to_typed** *json_string*
     - returns a typed TCL structure (pairs of types and values, M for object, L for list, S for string, N for number, BOOL for boolean)
+* **::tjson::typed_to_simple** *typedValue*
+    - Recursively converts a typed Tcl value directly to the same simple representation used by `jsonl_gets -simple`. Objects become dictionaries, arrays become lists, and `{N null}` becomes an empty string. For example, `::tjson::typed_to_simple {M {event {S signup} user {N 42}}}` returns `event signup user 42`.
 * **::tjson::typed_to_json** *typed_spec*
     - returns a JSON string from a typed TCL structure (like the one returned by ::tjson::json_to_typed)
 * **::tjson::parse** *json_string* *?varname?*

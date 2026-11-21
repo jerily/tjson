@@ -1,0 +1,197 @@
+package require tcltest
+package require tjson 1.0.29
+namespace import -force ::tcltest::test
+
+proc jsonlTemp {} {
+    upvar 1 ch ch path path
+    set ch [file tempfile path]
+    fconfigure $ch -translation binary
+}
+
+proc jsonlCleanup {} {
+    upvar 1 ch ch path path
+    close $ch
+    file delete $path
+}
+
+test jsonl-framing {CRLF, null, empty string, final record without LF and repeated EOF} -setup {
+    jsonlTemp
+    puts -nonewline $ch "null\r\n\"\"\nfalse"
+    seek $ch 0
+} -body {
+    set rows {}
+    while {[::tjson::jsonl_gets $ch row]} {lappend rows $row}
+    list $rows [::tjson::jsonl_gets $ch row] $row
+} -cleanup jsonlCleanup -result {{{N null} {S {}} {BOOL 0}} 0 {BOOL 0}}
+
+test jsonl-empty {EOF leaves an unset variable alone} -setup jsonlTemp -body {
+    list [::tjson::jsonl_gets $ch noRow] [info exists noRow]
+} -cleanup jsonlCleanup -result {0 0}
+
+test jsonl-recover {bad records consume exactly one line and preserve the variable} -setup {
+    jsonlTemp
+    puts $ch {}
+    puts $ch {{} {}}
+    puts $ch {{"a":0,"a":1}}
+    puts $ch [binary decode hex 22ff22]
+    puts $ch 5
+    seek $ch 0
+} -body {
+    set row original
+    set errors {}
+    for {set i 0} {$i < 4} {incr i} {
+        catch {::tjson::jsonl_gets $ch row} msg opts
+        lappend errors [dict get $opts -errorcode]
+    }
+    list [lsort -unique $errors] $row [::tjson::jsonl_gets $ch row] $row
+} -cleanup jsonlCleanup -result {{{TJSON STRICT}} original 1 {N 5}}
+
+test jsonl-bound {accept exactly 1 MiB before CRLF and drain an oversized record} -setup {
+    jsonlTemp
+    set content [string repeat x 1048574]
+    puts -nonewline $ch "\"$content\"\r\n\"$content!\"\n0\n"
+    seek $ch 0
+} -body {
+    list [::tjson::jsonl_gets $ch row] [string length [lindex $row 1]] \
+        [catch {::tjson::jsonl_gets $ch row}] [gets $ch]
+} -cleanup jsonlCleanup -result {1 1048574 1 0}
+
+test jsonl-write {compact UTF-8 bytes, escaped embedded newline, and typed round trip} -setup jsonlTemp -body {
+    set message "café\nline two"
+    set row [list M [dict create msg [list S $message] values {L {{N null} {BOOL 1}}}]]
+    set result [::tjson::jsonl_puts $ch $row]
+    seek $ch 0
+    set expected [encoding convertto utf-8 {{"msg":"café\nline two","values":[null,true]}}]
+    set correct [expr {[read $ch] eq "$expected\n"}]
+    seek $ch 0
+    list $result $correct [::tjson::jsonl_gets $ch copy] [expr {$copy eq $row}]
+} -cleanup jsonlCleanup -result {{} 1 1 1}
+
+test jsonl-invalid-write {invalid typed data writes no partial record} -setup jsonlTemp -body {
+    set rejected {}
+    foreach spec [list {BOOL maybe} {N 01} {N 1e999} {N {1,2}} [list N "1\n2"] \
+            {M {key invalid}} [list L "\{"] {L {{B {}}}}] {
+        lappend rejected [catch {::tjson::jsonl_puts $ch $spec}]
+    }
+    list [lsort -unique $rejected] [tell $ch]
+} -cleanup jsonlCleanup -result {1 0}
+
+test jsonl-nonblocking {reject nonblocking input before consuming any bytes} -setup {
+    jsonlTemp
+    puts $ch 1
+    seek $ch 0
+    fconfigure $ch -blocking 0
+} -body {
+    list [catch {::tjson::jsonl_gets $ch row}] [tell $ch]
+} -cleanup jsonlCleanup -result {1 0}
+
+test jsonl-unicode-keys {supplementary UTF-8 keys support Tcl dictionary lookup} -setup {
+    jsonlTemp
+    set face [encoding convertfrom utf-8 [binary decode hex f09f9880]]
+    set row [list M [dict create $face [list S $face]]]
+    ::tjson::jsonl_puts $ch $row
+    seek $ch 0
+} -body {
+    ::tjson::jsonl_gets $ch copy
+    expr {[dict get [lindex $copy 1] $face] eq [list S $face]}
+} -cleanup jsonlCleanup -result 1
+
+test jsonl-pipe {one read returns while the pipe writer is still open} -setup {
+    lassign [chan pipe] in out
+    fconfigure $out -encoding utf-8 -translation lf -buffering line
+    fconfigure $in -encoding utf-8 -translation lf
+} -body {
+    ::tjson::jsonl_puts $out {S café}
+    puts $out {next line}
+    list [::tjson::jsonl_gets $in row] $row [gets $in] \
+        [catch {::tjson::jsonl_gets $out row}] [catch {::tjson::jsonl_puts $in $row}]
+} -cleanup {
+    close $out
+    close $in
+} -result {1 {S café} {next line} 1 1}
+
+test jsonl-write-limits {oversized and deeply nested values leave the channel empty} -setup jsonlTemp -body {
+    set nested {N 1}
+    for {set i 0} {$i < 33} {incr i} {set nested [list L [list $nested]]}
+    list [catch {::tjson::jsonl_puts $ch $nested}] \
+        [catch {::tjson::jsonl_puts $ch [list S [string repeat a 1048575]]}] [tell $ch]
+} -cleanup jsonlCleanup -result {1 1 0}
+
+test jsonl-simple {read compound records and null directly as Tcl values} -setup {
+    jsonlTemp
+    puts $ch {{"items":[null,"",false,{"n":2}],"ok":true}}
+    puts $ch null
+    seek $ch 0
+} -body {
+    list [::tjson::jsonl_gets -simple $ch row] $row \
+        [::tjson::jsonl_gets -simple $ch row] $row [::tjson::jsonl_gets -simple $ch row]
+} -cleanup jsonlCleanup -result {1 {items {{} {} 0 {n 2}} ok 1} 1 {} 0}
+
+test jsonl-handle {independent roots, borrowed children and recovery after a bad record} -setup {
+    jsonlTemp
+    puts $ch {{"event":"signup"}}
+    puts $ch {{"x":1,"x":2}}
+    puts $ch null
+    seek $ch 0
+} -body {
+    ::tjson::jsonl_gets -handle $ch row
+    set first $row
+    catch {::tjson::jsonl_gets -handle $ch row} msg opts
+    set result [list [dict get $opts -errorcode] [expr {$row eq $first}]]
+    ::tjson::jsonl_gets -handle $ch row
+    set child [lindex [::tjson::query $first {$.event}] 0]
+    lappend result [::tjson::to_simple $child] [::tjson::is_null $row] [::tjson::jsonl_gets -handle $ch row]
+    ::tjson::destroy $first
+    lappend result [catch {::tjson::to_simple $child}]
+    ::tjson::destroy $row
+    set result
+} -cleanup jsonlCleanup -result {{TJSON STRICT} 1 signup 1 0 1}
+
+test jsonl-modes {bad options consume no input} -setup {
+    jsonlTemp
+    puts $ch null
+    seek $ch 0
+} -body {
+    list [catch {::tjson::jsonl_gets -s $ch row}] \
+        [catch {::tjson::jsonl_gets -simple -handle $ch row}] [tell $ch]
+} -cleanup jsonlCleanup -result {1 1 0}
+
+test jsonl-handle-write-error {reclaim the handle when a variable write trace rejects it} -setup {
+    jsonlTemp
+    puts $ch 42
+    seek $ch 0
+    proc rejectHandle {var args} {
+        upvar 1 $var handle
+        set ::capturedHandle $handle
+        set ::capturedValue [::tjson::to_simple $handle]
+        error rejected
+    }
+    trace add variable target write rejectHandle
+} -body {
+    list [catch {::tjson::jsonl_gets -handle $ch target}] $::capturedValue \
+        [catch {::tjson::to_simple $::capturedHandle}]
+} -cleanup {
+    trace remove variable target write rejectHandle
+    rename rejectHandle {}
+    unset -nocomplain target ::capturedValue ::capturedHandle
+    jsonlCleanup
+} -result {1 42 1}
+
+test jsonl-unicode-modes {non-BMP field access in every read mode} -setup {
+    jsonlTemp
+    set face [encoding convertfrom utf-8 [binary decode hex f09f9880]]
+    set row [list M [dict create $face [list S $face]]]
+    foreach mode {typed simple handle} {::tjson::jsonl_puts $ch $row}
+    seek $ch 0
+} -body {
+    ::tjson::jsonl_gets $ch typed
+    ::tjson::jsonl_gets -simple $ch simple
+    ::tjson::jsonl_gets -handle $ch root
+    try {
+        set child [::tjson::get_object_item $root $face]
+        expr {[dict get [::tjson::typed_to_simple $typed] $face] eq $face &&
+              [dict get $simple $face] eq $face && [::tjson::to_simple $child] eq $face}
+    } finally {
+        ::tjson::destroy $root
+    }
+} -cleanup jsonlCleanup -result 1
