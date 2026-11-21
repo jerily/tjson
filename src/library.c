@@ -179,7 +179,7 @@ static Tcl_Obj *tjson_TreeToSimple(Tcl_Interp *interp, cJSON *item) {
     }
 }
 
-static Tcl_Obj *tjson_TreeToTyped(Tcl_Interp *interp, cJSON *item) {
+static Tcl_Obj *tjson_TreeToTyped(Tcl_Interp *interp, cJSON *item, int preserveNull) {
 
     double d;
     Tcl_Obj *resultPtr = Tcl_NewListObj(0, NULL);
@@ -188,8 +188,8 @@ static Tcl_Obj *tjson_TreeToTyped(Tcl_Interp *interp, cJSON *item) {
     switch ((item->type) & 0xFF)
     {
         case cJSON_NULL:
-            Tcl_ListObjAppendElement(interp, resultPtr, Tcl_NewStringObj("S", 1));
-            Tcl_ListObjAppendElement(interp, resultPtr, Tcl_NewStringObj("", 0));
+            Tcl_ListObjAppendElement(interp, resultPtr, Tcl_NewStringObj(preserveNull ? "N" : "S", 1));
+            Tcl_ListObjAppendElement(interp, resultPtr, Tcl_NewStringObj(preserveNull ? "null" : "", -1));
             return resultPtr;
         case cJSON_False:
             Tcl_ListObjAppendElement(interp, resultPtr, Tcl_NewStringObj("BOOL", 4));
@@ -235,7 +235,7 @@ static Tcl_Obj *tjson_TreeToTyped(Tcl_Interp *interp, cJSON *item) {
             listPtr = Tcl_NewListObj(0, NULL);
             cJSON *current_element = item->child;
             while (current_element != NULL) {
-                Tcl_ListObjAppendElement(interp, listPtr, tjson_TreeToTyped(interp, current_element));
+                Tcl_ListObjAppendElement(interp, listPtr, tjson_TreeToTyped(interp, current_element, preserveNull));
                 current_element = current_element->next;
             }
             Tcl_ListObjAppendElement(interp, resultPtr, Tcl_NewStringObj("L", 1));
@@ -249,7 +249,7 @@ static Tcl_Obj *tjson_TreeToTyped(Tcl_Interp *interp, cJSON *item) {
                         interp,
                         dictPtr,
                         Tcl_NewStringObj(current_item->string, -1),
-                        tjson_TreeToTyped(interp, current_item));
+                        tjson_TreeToTyped(interp, current_item, preserveNull));
                 current_item = current_item->next;
             }
             Tcl_ListObjAppendElement(interp, resultPtr, Tcl_NewStringObj("M", 1));
@@ -324,7 +324,7 @@ static int tjson_JsonToTypedCmd(ClientData  clientData, Tcl_Interp *interp, int 
         const char *stopped = NULL;
         cJSON *root_structure = cJSON_ParseWithLengthOpts(json, length + 1, &stopped, 1);
         if (root_structure) {
-            Tcl_Obj *resultPtr = tjson_TreeToTyped(interp, root_structure);
+            Tcl_Obj *resultPtr = tjson_TreeToTyped(interp, root_structure, 0);
             cJSON_Delete(root_structure);
             Tcl_SetObjResult(interp, resultPtr);
         } else {
@@ -1086,7 +1086,7 @@ static int tjson_ToTypedCmd(ClientData  clientData, Tcl_Interp *interp, int objc
         return TCL_ERROR;
     }
 
-    Tcl_Obj *resultPtr = tjson_TreeToTyped(interp, root_structure);
+    Tcl_Obj *resultPtr = tjson_TreeToTyped(interp, root_structure, 0);
     Tcl_SetObjResult(interp, resultPtr);
     return TCL_OK;
 }
@@ -1361,12 +1361,25 @@ static int tjson_QueryCmd(ClientData  clientData, Tcl_Interp *interp, int objc, 
     return TCL_OK;
 }
 
-static int serialize(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_DString *dsPtr);
+// A negative depth selects the existing permissive typed_to_json format.
+static int serialize(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_DString *dsPtr, int depth);
 
-static int serialize_list(Tcl_Interp *interp, Tcl_Obj *listPtr, Tcl_DString *dsPtr) {
+static int serialize_string(Tcl_Interp *interp, Tcl_Obj *string, Tcl_DString *dsPtr, int depth) {
+    if (depth >= 0) {
+        Tcl_Size length;
+        Tcl_GetStringFromObj(string, &length);
+        if (length > 2 * TJSON_STRICT_MAX_BYTES) return tjson_StrictError(interp);
+    }
+    Tcl_DStringAppend(dsPtr, "\"", 1);
+    tjson_EscapeJsonString(string, dsPtr);
+    Tcl_DStringAppend(dsPtr, "\"", 1);
+    return TCL_OK;
+}
+
+static int serialize_list(Tcl_Interp *interp, Tcl_Obj *listPtr, Tcl_DString *dsPtr, int depth) {
     Tcl_DStringAppend(dsPtr, LBRACKET, 1);
     Tcl_Size listLength;
-    Tcl_ListObjLength(interp, listPtr, &listLength);
+    if (Tcl_ListObjLength(interp, listPtr, &listLength) != TCL_OK) return TCL_ERROR;
     int first = 1;
     for (Tcl_Size i = 0; i < listLength; i++) {
         if (!first) {
@@ -1376,7 +1389,7 @@ static int serialize_list(Tcl_Interp *interp, Tcl_Obj *listPtr, Tcl_DString *dsP
         }
         Tcl_Obj *elemSpecPtr;
         Tcl_ListObjIndex(interp, listPtr, i, &elemSpecPtr);
-        if (TCL_OK != serialize(interp, elemSpecPtr, dsPtr)) {
+        if (TCL_OK != serialize(interp, elemSpecPtr, dsPtr, depth)) {
             return TCL_ERROR;
         }
     }
@@ -1384,7 +1397,7 @@ static int serialize_list(Tcl_Interp *interp, Tcl_Obj *listPtr, Tcl_DString *dsP
     return TCL_OK;
 }
 
-static int serialize_map(Tcl_Interp *interp, Tcl_Obj *dictPtr, Tcl_DString *dsPtr) {
+static int serialize_map(Tcl_Interp *interp, Tcl_Obj *dictPtr, Tcl_DString *dsPtr, int depth) {
     Tcl_DStringAppend(dsPtr, LBRACE, -1);
     Tcl_DictSearch search;
     Tcl_Obj *key, *elemSpecPtr;
@@ -1401,10 +1414,13 @@ static int serialize_map(Tcl_Interp *interp, Tcl_Obj *dictPtr, Tcl_DString *dsPt
         } else {
             first = 0;
         }
-        Tcl_DStringAppend(dsPtr, "\"", 1);
-        tjson_EscapeJsonString(key, dsPtr);
-        Tcl_DStringAppend(dsPtr, "\":", 2);
-        if (TCL_OK != serialize(interp, elemSpecPtr, dsPtr)) {
+        if (serialize_string(interp, key, dsPtr, depth) != TCL_OK) {
+            Tcl_DictObjDone(&search);
+            return TCL_ERROR;
+        }
+        Tcl_DStringAppend(dsPtr, ":", 1);
+        if (TCL_OK != serialize(interp, elemSpecPtr, dsPtr, depth)) {
+            Tcl_DictObjDone(&search);
             return TCL_ERROR;
         }
     }
@@ -1413,9 +1429,23 @@ static int serialize_map(Tcl_Interp *interp, Tcl_Obj *dictPtr, Tcl_DString *dsPt
     return TCL_OK;
 }
 
-static int serialize(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_DString *dsPtr) {
+static int tjson_ValidNumber(const char *text, Tcl_Size length, Tcl_Obj *value) {
+    const unsigned char *start = (const unsigned char *)text;
+    tjson_strict_input input = {start, start + length, 0};
+    double number;
+    return length > 0 && tjson_StrictNumber(&input) && input.p == input.end &&
+           Tcl_GetDoubleFromObj(NULL, value, &number) == TCL_OK && isfinite(number);
+}
+
+static int serialize(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_DString *dsPtr, int depth) {
     Tcl_Size length;
-    Tcl_ListObjLength(interp, specPtr, &length);
+    // Tcl 8 can use six internal bytes for a four-byte UTF-8 character.
+    // Cap intermediate output too, including repeated references in nested lists.
+    if (depth >= 0 && (depth > TJSON_STRICT_DEFAULT_DEPTH ||
+                       Tcl_DStringLength(dsPtr) > 2 * TJSON_STRICT_MAX_BYTES)) {
+        return tjson_StrictError(interp);
+    }
+    if (Tcl_ListObjLength(interp, specPtr, &length) != TCL_OK) return TCL_ERROR;
     if (length != 2) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid spec", -1));
         return TCL_ERROR;  /* invalid spec length */
@@ -1427,32 +1457,44 @@ static int serialize(Tcl_Interp *interp, Tcl_Obj *specPtr, Tcl_DString *dsPtr) {
     const char *type = Tcl_GetStringFromObj(typePtr, &typeLength);
     Tcl_Size numstr_length;
     const char *numstr;
+    if (depth >= 0 && typeLength != 1 && !(typeLength == 4 && memcmp(type, "BOOL", 4) == 0)) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid type in spec", -1));
+        return TCL_ERROR;
+    }
+    int childDepth = depth < 0 ? -1 : depth + 1;
     switch(type[0]) {
         case 'S':
-            Tcl_DStringAppend(dsPtr, "\"", 1);
-            tjson_EscapeJsonString(valuePtr, dsPtr);
-            Tcl_DStringAppend(dsPtr, "\"", 1);
-            break;
+            return serialize_string(interp, valuePtr, dsPtr, depth);
         case 'N':
             numstr = Tcl_GetStringFromObj(valuePtr, &numstr_length);
+            if (depth >= 0 && !(numstr_length == 4 && memcmp(numstr, "null", 4) == 0)) {
+                if (!tjson_ValidNumber(numstr, numstr_length, valuePtr)) {
+                    Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid JSON number", -1));
+                    return TCL_ERROR;
+                }
+            }
             Tcl_DStringAppend(dsPtr, numstr, numstr_length);
             break;
         case 'B':
             if (typeLength == 1) {
+                if (depth >= 0) {
+                    Tcl_SetObjResult(interp, Tcl_NewStringObj("expected BOOL in typed spec", -1));
+                    return TCL_ERROR;
+                }
                 // TODO
             } else if (0 == strcmp("BOOL", type)) {
                 int flag;
-                Tcl_GetBooleanFromObj(interp, valuePtr, &flag);
+                if (Tcl_GetBooleanFromObj(interp, valuePtr, &flag) != TCL_OK) return TCL_ERROR;
                 Tcl_DStringAppend(dsPtr, flag ? "true" : "false", flag ? 4 : 5);
             }
             break;
         case 'M':
-            if (TCL_OK != serialize_map(interp, valuePtr, dsPtr)) {
+            if (TCL_OK != serialize_map(interp, valuePtr, dsPtr, childDepth)) {
                 return TCL_ERROR;
             }
             break;
         case 'L':
-            if (TCL_OK != serialize_list(interp, valuePtr, dsPtr)) {
+            if (TCL_OK != serialize_list(interp, valuePtr, dsPtr, childDepth)) {
                 return TCL_ERROR;
             }
             break;
@@ -1470,13 +1512,228 @@ static int tjson_TypedToJsonCmd(ClientData  clientData, Tcl_Interp *interp, int 
 
     Tcl_DString ds;
     Tcl_DStringInit(&ds);
-    if (TCL_OK != serialize(interp, objv[1], &ds)) {
+    if (TCL_OK != serialize(interp, objv[1], &ds, -1)) {
         Tcl_DStringFree(&ds);
         return TCL_ERROR;
     }
     Tcl_DStringResult(interp, &ds);
     Tcl_DStringFree(&ds);
     return TCL_OK;
+}
+
+// Return a borrowed scalar or a newly allocated value. The caller takes a
+// reference by storing the result in a Tcl container or interpreter result.
+static Tcl_Obj *tjson_TypedToSimple(Tcl_Interp *interp, Tcl_Obj *spec, int depth) {
+    Tcl_Size count;
+    Tcl_Obj **pair;
+    if (depth > CJSON_NESTING_LIMIT) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("typed value exceeds nesting limit", -1));
+        return NULL;
+    }
+    if (Tcl_ListObjGetElements(interp, spec, &count, &pair) != TCL_OK) return NULL;
+    if (count != 2) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("expected a type and a value", -1));
+        return NULL;
+    }
+    static const char *const tags[] = {"S", "N", "BOOL", "L", "M", NULL};
+    enum {STRING, NUMBER, BOOLEAN, ARRAY, OBJECT};
+    int tag;
+    if (Tcl_GetIndexFromObj(interp, pair[0], tags, "type", TCL_EXACT, &tag) != TCL_OK) return NULL;
+    Tcl_Obj *value = pair[1];
+    switch (tag) {
+        case STRING:
+            return value;
+        case NUMBER: {
+            Tcl_Size length;
+            const char *text = Tcl_GetStringFromObj(value, &length);
+            if (length == 4 && memcmp(text, "null", 4) == 0) return Tcl_NewObj();
+            if (tjson_ValidNumber(text, length, value)) return value;
+            Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid JSON number", -1));
+            return NULL;
+        }
+        case BOOLEAN: {
+            int flag;
+            if (Tcl_GetBooleanFromObj(interp, value, &flag) != TCL_OK) return NULL;
+            return Tcl_NewBooleanObj(flag);
+        }
+        case ARRAY: {
+            Tcl_Obj **items;
+            if (Tcl_ListObjGetElements(interp, value, &count, &items) != TCL_OK) return NULL;
+            Tcl_Obj *list = Tcl_NewListObj(0, NULL);
+            for (Tcl_Size i = 0; i < count; i++) {
+                Tcl_Obj *item = tjson_TypedToSimple(interp, items[i], depth + 1);
+                if (!item) {
+                    Tcl_DecrRefCount(list);
+                    return NULL;
+                }
+                Tcl_ListObjAppendElement(interp, list, item);
+            }
+            return list;
+        }
+        case OBJECT: {
+            Tcl_DictSearch search;
+            Tcl_Obj *key, *child;
+            int done;
+            if (Tcl_DictObjFirst(interp, value, &search, &key, &child, &done) != TCL_OK) return NULL;
+            Tcl_Obj *dict = Tcl_NewDictObj();
+            for (; !done; Tcl_DictObjNext(&search, &key, &child, &done)) {
+                Tcl_Obj *item = tjson_TypedToSimple(interp, child, depth + 1);
+                if (!item) {
+                    Tcl_DictObjDone(&search);
+                    Tcl_DecrRefCount(dict);
+                    return NULL;
+                }
+                Tcl_DictObjPut(interp, dict, key, item);
+            }
+            Tcl_DictObjDone(&search);
+            return dict;
+        }
+    }
+    return NULL;
+}
+
+static int tjson_TypedToSimpleCmd(ClientData data, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]) {
+    CheckArgs(2, 2, 1, "typedValue");
+    Tcl_Obj *result = tjson_TypedToSimple(interp, objv[1], 0);
+    if (!result) return TCL_ERROR;
+    Tcl_SetObjResult(interp, result);
+    return TCL_OK;
+}
+
+static Tcl_Channel tjson_JsonlChannel(Tcl_Interp *interp, Tcl_Obj *name, int direction) {
+    int mode;
+    Tcl_Channel channel = Tcl_GetChannel(interp, Tcl_GetString(name), &mode);
+    if (!channel) return NULL;
+    if (!(mode & direction)) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj(direction == TCL_READABLE ?
+                "channel is not readable" : "channel is not writable", -1));
+        return NULL;
+    }
+    return channel;
+}
+
+enum tjson_record_mode {RECORD_HANDLE, RECORD_SIMPLE, RECORD_TYPED};
+
+// A variable write trace may inspect, destroy, or replace the new handle.
+// Mark the root during assignment so rollback cannot delete a recycled node.
+#define TJSON_PENDING_HANDLE 2
+static int tjson_AssignRecord(Tcl_Interp *interp, Tcl_Obj *var, cJSON *tree, int mode) {
+    char handle[80];
+    Tcl_Obj *value;
+    if (mode == RECORD_HANDLE) {
+        CMD_NAME(handle, tree);
+        tree->flags |= TJSON_PENDING_HANDLE;
+        tjson_RegisterNode(handle, tree);
+        value = Tcl_NewStringObj(handle, -1);
+    } else {
+        value = mode == RECORD_SIMPLE ? tjson_TreeToSimple(interp, tree) : tjson_TreeToTyped(interp, tree, 1);
+        cJSON_Delete(tree);
+    }
+
+    Tcl_IncrRefCount(value);
+    Tcl_Obj *assigned = Tcl_ObjSetVar2(interp, var, NULL, value, TCL_LEAVE_ERR_MSG);
+    Tcl_DecrRefCount(value);
+    if (mode == RECORD_HANDLE) {
+        cJSON *live = tjson_GetInternalFromNode(handle);
+        int pending = live && (live->flags & TJSON_PENDING_HANDLE);
+        if (pending) live->flags &= ~TJSON_PENDING_HANDLE;
+        if (!assigned || !pending || strcmp(Tcl_GetString(assigned), handle) != 0) {
+            if (pending) {
+                tjson_UnregisterNode(handle);
+                cJSON_Delete(live);
+            }
+            if (assigned) Tcl_SetObjResult(interp, Tcl_NewStringObj("handle replaced during assignment", -1));
+            return TCL_ERROR;
+        }
+    }
+    if (!assigned) return TCL_ERROR;
+    Tcl_SetObjResult(interp, Tcl_NewIntObj(1));
+    return TCL_OK;
+}
+
+static int tjson_JsonlGetsCmd(ClientData data, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]) {
+    CheckArgs(3, 4, 1, "?-handle|-simple? channel varName");
+    static const char *const options[] = {"-handle", "-simple", NULL};
+    int mode = RECORD_TYPED;
+    if (objc == 4 && Tcl_GetIndexFromObj(interp, objv[1], options, "option", TCL_EXACT, &mode) != TCL_OK) {
+        return TCL_ERROR;
+    }
+    Tcl_Channel channel = tjson_JsonlChannel(interp, objv[objc - 2], TCL_READABLE);
+    if (!channel) return TCL_ERROR;
+
+    Tcl_DString line;
+    Tcl_DStringInit(&line);
+    int status = Tcl_GetChannelOption(interp, channel, "-blocking", &line);
+    if (status != TCL_OK) goto done;
+    if (strcmp(Tcl_DStringValue(&line), "0") == 0) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj("jsonl_gets requires a blocking channel", -1));
+        status = TCL_ERROR;
+        goto done;
+    }
+    Tcl_DStringSetLength(&line, 0);
+
+    // Tcl buffers the channel. Stop exactly at LF so other readers can share it.
+    char c;
+    int count;
+    while ((count = Tcl_Read(channel, &c, 1)) == 1 && c != '\n') {
+        // Drain oversized records, retaining room for a possible CR before LF.
+        if (Tcl_DStringLength(&line) < TJSON_STRICT_MAX_BYTES + 2) {
+            Tcl_DStringAppend(&line, &c, 1);
+        }
+    }
+    Tcl_Size length = Tcl_DStringLength(&line);
+    if (count < 0) {
+        Tcl_SetObjResult(interp, Tcl_ObjPrintf("error reading JSONL channel: %s", Tcl_PosixError(interp)));
+        status = TCL_ERROR;
+    } else if (count == 0 && length == 0) {
+        Tcl_SetObjResult(interp, Tcl_NewIntObj(0));
+    } else {
+        if (count == 1 && length && Tcl_DStringValue(&line)[length - 1] == '\r') {
+            Tcl_DStringSetLength(&line, --length);
+        }
+        cJSON *tree;
+        status = tjson_ParseStrict(interp, Tcl_DStringValue(&line), length, TJSON_STRICT_DEFAULT_DEPTH, &tree);
+        if (status == TCL_OK) status = tjson_AssignRecord(interp, objv[objc - 1], tree, mode);
+    }
+done:
+    Tcl_DStringFree(&line);
+    return status;
+}
+
+static int tjson_JsonlPutsCmd(ClientData data, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]) {
+    CheckArgs(3, 3, 1, "channel typedValue");
+    Tcl_Channel channel = tjson_JsonlChannel(interp, objv[1], TCL_WRITABLE);
+    if (!channel) return TCL_ERROR;
+
+    Tcl_DString json;
+    Tcl_DStringInit(&json);
+    int status = serialize(interp, objv[2], &json, 0);
+    if (status == TCL_OK) {
+        // Convert Tcl's internal string representation to standard UTF-8 on the wire.
+        Tcl_Encoding encoding = Tcl_GetEncoding(interp, "utf-8");
+        if (!encoding) {
+            Tcl_DStringFree(&json);
+            return TCL_ERROR;
+        }
+        Tcl_DString bytes;
+        Tcl_UtfToExternalDString(encoding, Tcl_DStringValue(&json), Tcl_DStringLength(&json), &bytes);
+        Tcl_FreeEncoding(encoding);
+        Tcl_Size length = Tcl_DStringLength(&bytes);
+        const unsigned char *start = (const unsigned char *)Tcl_DStringValue(&bytes);
+        tjson_strict_input input = {start, start + length, TJSON_STRICT_DEFAULT_DEPTH};
+        if (length > TJSON_STRICT_MAX_BYTES || !tjson_StrictValue(&input, 0) || input.p != input.end) {
+            status = tjson_StrictError(interp);
+        } else {
+            Tcl_DStringAppend(&bytes, "\n", 1);
+            if (Tcl_Write(channel, Tcl_DStringValue(&bytes), Tcl_DStringLength(&bytes)) < 0) {
+                Tcl_SetObjResult(interp, Tcl_ObjPrintf("error writing JSONL channel: %s", Tcl_PosixError(interp)));
+                status = TCL_ERROR;
+            }
+        }
+        Tcl_DStringFree(&bytes);
+    }
+    Tcl_DStringFree(&json);
+    return status;
 }
 
 static int tjson_EscapeJsonStringCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
@@ -1557,6 +1814,9 @@ int Tjson_Init(Tcl_Interp *interp) {
     Tcl_CreateObjCommand(interp, "::tjson::json_to_typed", tjson_JsonToTypedCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::json_to_typed_strict", tjson_StrictCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::json_to_simple", tjson_JsonToSimpleCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::jsonl_gets", tjson_JsonlGetsCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::jsonl_puts", tjson_JsonlPutsCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tjson::typed_to_simple", tjson_TypedToSimpleCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::typed_to_json", tjson_TypedToJsonCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::escape_json_string", tjson_EscapeJsonStringCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "::tjson::parse", tjson_ParseCmd, NULL, NULL);
