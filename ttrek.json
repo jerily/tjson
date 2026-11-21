@@ -1,6 +1,6 @@
 {
   "name": "tjson",
-  "version": "1.0.29",
+  "version": "1.0.30",
   "scripts": {
 
   },
@@ -14,7 +14,7 @@
     "default": [
       {
         "cmd": "download",
-        "url": "https://github.com/jerily/tjson/archive/refs/tags/v1.0.29.tar.gz"
+        "url": "https://github.com/jerily/tjson/archive/refs/tags/v1.0.30.tar.gz"
       },
       {
         "cmd": "unpack"

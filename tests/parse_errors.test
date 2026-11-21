@@ -15,7 +15,7 @@ proc parse_errors {cmd inputs} {
 }
 
 test parse_errors-1 {text after the first value is rejected at the start of that text} -body {
-    parse_errors json_to_typed [list \
+    parse_errors json_to_simple [list \
         {"count":5,"ratio":22.5} \
         "\{\"a\":1\} trailing" \
         {5 6} \
@@ -27,15 +27,15 @@ test parse_errors-1 {text after the first value is rejected at the start of that
     {invalid json at line 1, column 5: "[2]"}]
 
 test parse_errors-2 {line and column are counted from the last newline} -body {
-    parse_errors json_to_typed [list "\{\n  \"a\": 1,\n  \"b\" 2\n\}"]
+    parse_errors json_to_simple [list "\{\n  \"a\": 1,\n  \"b\" 2\n\}"]
 } -result [list {invalid json at line 3, column 7: "2"}]
 
 test parse_errors-3 {column is counted in characters, not bytes} -body {
-    parse_errors json_to_typed [list "\{\"\u00e9\": 1\} \u00fc"]
+    parse_errors json_to_simple [list "\{\"\u00e9\": 1\} \u00fc"]
 } -result [list "invalid json at line 1, column 10: \"\u00fc\""]
 
 test parse_errors-4 {excerpt is cut after 20 whole characters with an ellipsis} -body {
-    parse_errors json_to_typed [list \
+    parse_errors json_to_simple [list \
         "\{\"\u00e9\": 1\} [string repeat \u00fc 22]" \
         "1 \u4e2d\u6587\u5b57[string repeat x 20]"]
 } -result [list \
@@ -43,11 +43,11 @@ test parse_errors-4 {excerpt is cut after 20 whole characters with an ellipsis} 
     "invalid json at line 1, column 3: \"\u4e2d\u6587\u5b57[string repeat x 17]...\""]
 
 test parse_errors-5 {excerpt stops at a newline without an ellipsis} -body {
-    parse_errors json_to_typed [list "1 [string repeat y 19]\nzzz"]
+    parse_errors json_to_simple [list "1 [string repeat y 19]\nzzz"]
 } -result [list "invalid json at line 1, column 3: \"[string repeat y 19]\""]
 
 test parse_errors-6 {input that ends early reports unexpected end of input} -body {
-    parse_errors json_to_typed [list "\{\"a\":" {[1,2,} {   } "\n\n  "]
+    parse_errors json_to_simple [list "\{\"a\":" {[1,2,} {   } "\n\n  "]
 } -result [list \
     {invalid json at line 1, column 6: unexpected end of input} \
     {invalid json at line 1, column 6: unexpected end of input} \
@@ -55,11 +55,11 @@ test parse_errors-6 {input that ends early reports unexpected end of input} -bod
     {invalid json at line 3, column 3: unexpected end of input}]
 
 test parse_errors-7 {unterminated string reports the text after the opening quote} -body {
-    parse_errors json_to_typed [list "\{\"abc"]
+    parse_errors json_to_simple [list "\{\"abc"]
 } -result [list {invalid json at line 1, column 3: "abc"}]
 
 test parse_errors-8 {missing object value reports the closing brace} -body {
-    parse_errors json_to_typed [list "\{\"a\":\}"]
+    parse_errors json_to_simple [list "\{\"a\":\}"]
 } -result [list "invalid json at line 1, column 6: \"\}\""]
 
 test parse_errors-9 {valid input still parses, with or without surrounding whitespace} -body {
@@ -77,9 +77,9 @@ test parse_errors-10 {json_to_simple and parse accept the same valid input} -bod
     }
 } -result {{{a 1} {{"a":1}}} {{1 2} {[1,2]}}}
 
-test parse_errors-11 {json_to_typed, json_to_simple and parse report the same message} -body {
+test parse_errors-11 {json_to_simple and parse report the same message} -body {
     set inputs [list {5 6} "\{\"a\":" "\{\"\u00e9\": 1\} \u00fc"]
-    lsort -unique [lmap cmd {json_to_typed json_to_simple parse} {
+    lsort -unique [lmap cmd {json_to_simple parse} {
         parse_errors $cmd $inputs
     }]
 } -result [list [list \
@@ -91,19 +91,19 @@ test parse_errors-12 {parse rejects empty input as empty json} -body {
     ::tjson::parse {}
 } -returnCodes error -result {empty json}
 
-test parse_errors-13 {json_to_typed returns an empty result for empty input} -body {
-    ::tjson::json_to_typed {}
+test parse_errors-13 {json_to_simple returns an empty result for empty input} -body {
+    ::tjson::json_to_simple {}
 } -result {}
 
 # Tcl 8.6 counts a character outside the BMP as two characters, Tcl 9 as one
 set bmp_prefix "\{\"\ud83d\ude00\": 1\} "
 
 test parse_errors-14 {column before a character outside the BMP matches string length} -body {
-    parse_errors json_to_typed [list "${bmp_prefix}x"]
+    parse_errors json_to_simple [list "${bmp_prefix}x"]
 } -result [list "invalid json at line 1, column [expr {[string length $bmp_prefix] + 1}]: \"x\""]
 
 test parse_errors-15 {excerpt counts a character outside the BMP once and never splits it} -body {
-    parse_errors json_to_typed [list \
+    parse_errors json_to_simple [list \
         "1 [string repeat \ud83d\ude00 22]" \
         "1 [string repeat x 19]\ud83d\ude00\ud83d\ude00" \
         "1 [string repeat x 19]\ud83d\ude00"]
@@ -117,6 +117,6 @@ test parse_errors-15 {excerpt counts a character outside the BMP once and never 
 
 test parse_errors-16 {excerpt keeps a raw 4-byte UTF-8 sequence whole} -constraints identityEncoding -body {
     set e [encoding convertfrom identity [binary decode hex f09f9880]]
-    catch {::tjson::json_to_typed "1 [string repeat x 19]$e$e"} msg
+    catch {::tjson::json_to_simple "1 [string repeat x 19]$e$e"} msg
     binary encode hex [encoding convertto identity $msg]
 } -result [binary encode hex "invalid json at line 1, column 3: \"[string repeat x 19]"]f09f98802e2e2e22

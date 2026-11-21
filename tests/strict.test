@@ -1,23 +1,54 @@
 package require tcltest
-package require tjson 1.0.28
+package require tjson 1.0.30
 namespace import ::tcltest::test
 test strict-types {strict parsing preserves null, booleans and arrays} -body {
-    ::tjson::json_to_typed_strict {{"ok":true,"n":null,"a":["x",2]}}
+    ::tjson::json_to_typed {{"ok":true,"n":null,"a":["x",2]}}
 } -result {M {ok {BOOL 1} n {N null} a {L {{S x} {N 2}}}}}
 test strict-rejections {ambiguous and non-JSON documents fail without input excerpts} -body {
     set result {}
     foreach json [list {{"a":1,"a":2}} {{"a":1,"\u0061":2}} {{"nested":{"x":1,"x":2}}} \
         {{"alg":"RS256\u0000none"}} {{"a":"\ud800"}} {{"a":01}} {{"a":1.}} {{"a":+1}} \
         {{"a":1e999}} {{"a":false,}} {{} trailing} [format {"line%sfeed"} \n] {}] {
-        lappend result [catch {::tjson::json_to_typed_strict $json} message]
+        lappend result [catch {::tjson::json_to_typed $json} message]
         if {[string first "RS256" $message] >= 0} {error "parser disclosed input"}
     }
     lsort -unique $result
 } -result 1
 test strict-depth {limits are enforced before tree allocation} -body {
-    list [catch {::tjson::json_to_typed_strict {[[[1]]]} 1}] \
-        [::tjson::json_to_typed_strict {[[1]]} 2]
+    list [catch {::tjson::json_to_typed -maxdepth 1 {[[[1]]]}}] \
+        [::tjson::json_to_typed -maxdepth 2 {[[1]]}]
 } -result {1 {L {{L {{N 1}}}}}}
 test strict-unicode {valid escaped and literal UTF-8 remain valid} -body {
-    ::tjson::json_to_typed_strict {{"name":"Καλημέρα","emoji":"\ud83d\ude00"}}
+    ::tjson::json_to_typed {{"name":"Καλημέρα","emoji":"\ud83d\ude00"}}
 } -result [list M [dict create name {S Καλημέρα} emoji [list S [encoding convertfrom utf-8 [binary decode hex f09f9880]]]]]
+
+test typed-limits {larger documents are accepted by default and limits are inclusive} -body {
+    set text [string repeat a 1048576]
+    set json [format {"%s"} $text]
+    set deep [string repeat {[} 33][string repeat {]} 33]
+    list [expr {[lindex [::tjson::json_to_typed $json] 1] eq $text}] \
+        [catch {::tjson::json_to_typed -maxbytes 1048576 $json}] \
+        [catch {::tjson::json_to_typed $deep}] \
+        [catch {::tjson::json_to_typed -maxdepth 32 $deep}] \
+        [catch {::tjson::json_to_typed -maxdepth 33 -maxbytes 66 $deep}] \
+        [::tjson::json_to_typed -1]
+} -result {1 1 0 1 0 {N -1}}
+
+test typed-utf8-size {byte limit counts supplementary characters as four UTF-8 bytes} -body {
+    set emoji [encoding convertfrom utf-8 [binary decode hex f09f9880]]
+    set json [format {"%s"} $emoji]
+    list [expr {[::tjson::json_to_typed -maxbytes 6 $json] eq [list S $emoji]}] \
+        [catch {::tjson::json_to_typed -maxbytes 5 $json}]
+} -result {1 1}
+
+test typed-options {invalid limit options raise errors} -body {
+    lmap options {{-maxbytes 0} {-maxdepth 0} {-maxdepth 1001} {-maxbytes abc} {-unknown 1} {-maxdepth}} {
+        catch {::tjson::json_to_typed {*}$options null}
+    }
+} -result {1 1 1 1 1 1}
+
+test strict-compatibility {the original command supports its positional nesting limit} -body {
+    list [::tjson::json_to_typed_strict null] \
+        [catch {::tjson::json_to_typed_strict {[[]]} 1}] \
+        [catch {::tjson::json_to_typed_strict [string repeat { } 1048576]0}]
+} -result {{N null} 1 1}

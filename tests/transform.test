@@ -35,7 +35,7 @@ test typed_to_json-2 {convert typed spec of different types to json} {
 
 test json_to_typed-5 {invalid json raises an error instead of crashing} -body {
     ::tjson::json_to_typed {John Doe}
-} -returnCodes error -match glob -result {invalid json*}
+} -returnCodes error -errorCode {TJSON STRICT} -result {invalid, ambiguous or oversized JSON document}
 
 test typed_to_simple-1 {convert typed containers and scalar values directly} -body {
     ::tjson::typed_to_simple {M {values {L {{N null} {S null} {BOOL yes} {N 2.5} {M {}} {L {}}}}}}
