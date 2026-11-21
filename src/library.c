@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <limits.h>
 #include <stdlib.h>
 
 #ifndef TCL_SIZE_MAX
@@ -312,28 +313,6 @@ static int tjson_InvalidJson(Tcl_Interp *interp, const char *json, Tcl_Size leng
 }
 
 #include "strict_json.h"
-
-static int tjson_JsonToTypedCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
-    DBG(fprintf(stderr, "JsonToTypedCmd\n"));
-    CheckArgs(2,2,1,"json");
-
-    Tcl_Size length;
-    const char *json = Tcl_GetStringFromObj(objv[1], &length);
-
-    if (length > 0) {
-        const char *stopped = NULL;
-        cJSON *root_structure = cJSON_ParseWithLengthOpts(json, length + 1, &stopped, 1);
-        if (root_structure) {
-            Tcl_Obj *resultPtr = tjson_TreeToTyped(interp, root_structure, 0);
-            cJSON_Delete(root_structure);
-            Tcl_SetObjResult(interp, resultPtr);
-        } else {
-            return tjson_InvalidJson(interp, json, length, stopped);
-        }
-    }
-
-    return TCL_OK;
-}
 
 static int tjson_JsonToSimpleCmd(ClientData  clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[] ) {
     DBG(fprintf(stderr, "JsonToSimpleCmd\n"));
@@ -1692,7 +1671,7 @@ static int tjson_JsonlGetsCmd(ClientData data, Tcl_Interp *interp, int objc, Tcl
             Tcl_DStringSetLength(&line, --length);
         }
         cJSON *tree;
-        status = tjson_ParseStrict(interp, Tcl_DStringValue(&line), length, TJSON_STRICT_DEFAULT_DEPTH, &tree);
+        status = tjson_ParseStrict(interp, Tcl_DStringValue(&line), length, TJSON_STRICT_MAX_BYTES, TJSON_STRICT_DEFAULT_DEPTH, &tree);
         if (status == TCL_OK) status = tjson_AssignRecord(interp, objv[objc - 1], tree, mode);
     }
 done:

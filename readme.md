@@ -20,8 +20,7 @@ variable leaves the previous root alive. Destroying the root also invalidates
 its child handles.
 
 `::tjson::jsonl_puts channel typedValue` writes one compact JSON value and a
-newline and returns the empty string. Both commands use UTF-8 bytes and the
-strict JSON limits below, including a 1 MiB payload and default depth of 32.
+newline and returns the empty string. Both commands use UTF-8 and limit each record to 1 MiB and 32 levels of nesting.
 Use binary translation for exact on-disk framing. The caller owns the channel
 and controls flushing and closing.
 
@@ -39,16 +38,25 @@ try {
 }
 ```
 
-## Strict JSON (1.0.28)
+## Typed JSON parsing (1.0.30)
 
-`::tjson::json_to_typed_strict json ?maximumDepth=32?` returns a typed Tcl value,
-preserving null as `{N null}`. It rejects duplicate object keys (including escaped
-aliases), malformed numbers, trailing data, invalid UTF-8/surrogates, NUL, and
-non-finite numbers. Input is limited to 1 MiB; depth is configurable from 1 to 128.
-Numbers longer than 63 characters are rejected to match the underlying parser's
-numeric buffer. Errors have code `{TJSON STRICT}` and do not quote input values.
-Existing permissive parsing commands retain their behavior. Use the strict
-command for security-sensitive protocol documents and JWT preflight parsing.
+`::tjson::json_to_typed ?-maxbytes bytes? ?-maxdepth levels? json` parses one
+complete JSON value. It preserves null as `{N null}` and rejects duplicate
+object keys (including escaped aliases), malformed JSON, invalid Unicode, and
+trailing data. Document errors have code `{TJSON STRICT}` and omit input values.
+
+By default the input can be as large as a Tcl string. The default maximum depth
+is cJSON’s nesting limit (1000 in this build). Each enclosing object or array,
+including an empty one, counts as one level. Both options take positive integers.
+For example, to limit a protocol message to 1 MiB of UTF-8 and 32 levels, use
+`::tjson::json_to_typed -maxbytes 1048576 -maxdepth 32 $message`.
+
+cJSON uses NUL-terminated strings and double-precision numbers. The parser
+rejects NUL in strings (including `\u0000`), non-finite numeric results, and
+number tokens longer than 63 characters. Large integers may lose precision.
+
+The older `::tjson::json_to_typed_strict json ?maximumDepth?` command remains
+available with its 1 MiB limit and default depth of 32 (configurable from 1 to 128).
 
 TCL/C extension for parsing, manipulating, and querying JSON.
 
@@ -115,7 +123,7 @@ make install
 
 * **::tjson::json_to_simple** *json_string*
     - returns a simple TCL structure (e.g. list, dict, or string)
-* **::tjson::json_to_typed** *json_string*
+* **::tjson::json_to_typed** *?-maxbytes bytes? ?-maxdepth levels? json_string*
     - returns a typed TCL structure (pairs of types and values, M for object, L for list, S for string, N for number, BOOL for boolean)
 * **::tjson::typed_to_simple** *typedValue*
     - Recursively converts a typed Tcl value directly to the same simple representation used by `jsonl_gets -simple`. Objects become dictionaries, arrays become lists, and `{N null}` becomes an empty string. For example, `::tjson::typed_to_simple {M {event {S signup} user {N 42}}}` returns `event signup user 42`.
